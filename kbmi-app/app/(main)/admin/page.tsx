@@ -12,6 +12,7 @@ import {
 import { useLang } from '@/lib/language-context'
 import { useAuth } from '@/lib/auth-context'
 import { useData } from '@/lib/data-context'
+import { supabase } from '@/lib/supabase'
 import { Announcement, Event, MediaItem, ContributionDrive, Expense, FeedbackItem, User, Poll, PollOption } from '@/lib/mock-data'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -85,6 +86,7 @@ export default function AdminPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [deleteUserConfirmId, setDeleteUserConfirmId] = useState<string | null>(null)
   const [editingUserProfile, setEditingUserProfile] = useState(false)
+  const [mediaUploading, setMediaUploading] = useState(false)
   const [editUserForm, setEditUserForm] = useState({ name: '', email: '', phone: '', dob: '', address: '', familyMembers: [] as { name: string; relationship: string }[] })
   const [newFamName, setNewFamName] = useState('')
   const [newFamRel, setNewFamRel] = useState('husband')
@@ -147,20 +149,27 @@ export default function AdminPage() {
   const netBalance = totalCollected - totalSpent
 
   // ── Media helpers ───────────────────────────────────────────────────────────
-  const handleMediaUpload = <T extends { media: MediaItem[] }>(
+  const uploadToStorage = async (file: File): Promise<MediaItem | null> => {
+    const ext = file.name.split('.').pop() || 'jpg'
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const { data, error } = await supabase.storage.from('media').upload(path, file)
+    if (error || !data) return null
+    const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(data.path)
+    return { type: file.type.startsWith('video') ? 'video' : 'image', url: publicUrl }
+  }
+
+  const handleMediaUpload = async <T extends { media: MediaItem[] }>(
     e: React.ChangeEvent<HTMLInputElement>,
     setter: React.Dispatch<React.SetStateAction<T>>
   ) => {
-    Array.from(e.target.files || []).forEach((file) => {
-      const reader = new FileReader()
-      reader.onload = (ev) => {
-        const url = ev.target?.result as string
-        const type: MediaItem['type'] = file.type.startsWith('video') ? 'video' : 'image'
-        setter((prev) => ({ ...prev, media: [...prev.media, { type, url }] }))
-      }
-      reader.readAsDataURL(file)
-    })
+    const files = Array.from(e.target.files || [])
     e.target.value = ''
+    for (const file of files) {
+      setMediaUploading(true)
+      const item = await uploadToStorage(file)
+      setMediaUploading(false)
+      if (item) setter((prev) => ({ ...prev, media: [...prev.media, item] }))
+    }
   }
 
   const removeMedia = <T extends { media: MediaItem[] }>(
@@ -193,10 +202,12 @@ export default function AdminPage() {
             ))}
           </div>
         )}
-        <label className="flex cursor-pointer items-center gap-2 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500 hover:border-emerald-400 hover:bg-emerald-50 transition-colors">
+        <label className={`flex cursor-pointer items-center gap-2 rounded-xl border-2 border-dashed px-4 py-3 text-sm transition-colors ${mediaUploading ? 'border-emerald-400 bg-emerald-50 text-emerald-600 cursor-wait' : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-emerald-400 hover:bg-emerald-50'}`}>
           <ImagePlus className="h-4 w-4" />
-          {lang === 'en' ? 'Click to upload photos or videos' : 'Klik untuk muat naik'}
-          <input type="file" accept="image/*,video/*" multiple className="hidden"
+          {mediaUploading
+            ? (lang === 'en' ? 'Uploading…' : 'Memuat naik…')
+            : (lang === 'en' ? 'Click to upload photos or videos' : 'Klik untuk muat naik')}
+          <input type="file" accept="image/*,video/*" multiple className="hidden" disabled={mediaUploading}
             onChange={(e) => handleMediaUpload(e, setForm)} />
         </label>
       </div>
