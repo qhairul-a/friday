@@ -59,6 +59,7 @@ export default function AdminPage() {
     users, toggleHeadOfFamily, setUserRole, deleteUser, updateUserById,
     drives, addDrive, updateDrive, toggleDriveStatus, confirmContribution, toggleContributionConfirm, recordContribution, removeContribution, addExpense,
     feedback, markFeedbackResolved, reopenFeedback, deleteFeedback,
+    listings,
     polls, addPoll, updatePoll, deletePoll,
     financeStats, setFinanceStats,
     auditLog, addAuditEntry,
@@ -617,7 +618,7 @@ export default function AdminPage() {
               {lang === 'en' ? 'Interactivity' : 'Interaktiviti'}
             </h3>
             <div className="rounded-2xl bg-white p-4 shadow-sm border border-gray-100">
-              <DashboardCharts lang={lang} />
+              <DashboardCharts lang={lang} announcements={announcements} events={events} listings={listings} polls={polls} drives={drives} />
             </div>
           </div>
 
