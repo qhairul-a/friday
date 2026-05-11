@@ -148,6 +148,16 @@ export interface FeedbackItem {
 // ─── Mock Users ───────────────────────────────────────────────────────────────
 export const MOCK_USERS: User[] = [
   {
+    id: 'u0',
+    name: 'Qhairul Asmai',
+    email: 'qhairul.asmai@gmail.com',
+    role: 'super_admin',
+    branch: 'Cawangan Utama',
+    avatar: 'QA',
+    joinedAt: '2026-05-11',
+    totalContributed: 0,
+  },
+  {
     id: 'u1',
     name: 'Ahmad Razif Mat Indra',
     email: 'superadmin@kbmi.com',
