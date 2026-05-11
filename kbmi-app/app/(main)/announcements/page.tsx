@@ -146,7 +146,7 @@ function PostCard({ ann, lang, tr }: { ann: Announcement; lang: string; tr: Retu
 
       {/* Title + body */}
       <div className="px-4 pb-3 space-y-1">
-        <Link href={`/announcements/${ann.id}`}>
+        <Link href={`/announcements/${ann.id}`} className="hover:underline">
           <h3 className="text-sm font-bold text-gray-900 leading-snug">{ann.title}</h3>
         </Link>
 
@@ -171,9 +171,10 @@ function PostCard({ ann, lang, tr }: { ann: Announcement; lang: string; tr: Retu
         ) : (
           <Link
             href={`/announcements/${ann.id}`}
-            className="block text-xs text-gray-400 hover:text-emerald-600 transition-colors mt-1"
+            className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-600 px-4 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors"
           >
-            {lang === 'en' ? 'Add a comment…' : 'Tambah komen…'}
+            <MessageCircle className="h-3.5 w-3.5" />
+            {lang === 'en' ? 'Add a comment' : 'Tambah komen'}
           </Link>
         )}
       </div>

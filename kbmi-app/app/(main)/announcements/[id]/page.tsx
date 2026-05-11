@@ -53,7 +53,7 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <span className="text-sm font-semibold text-gray-600">
-          {lang === 'en' ? 'Back to Announcements' : 'Kembali ke Pengumuman'}
+          {lang === 'en' ? 'Back to Bulletin' : 'Kembali ke Buletin'}
         </span>
       </div>
 
