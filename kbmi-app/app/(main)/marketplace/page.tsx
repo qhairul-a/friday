@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ArrowLeft, ShoppingBag, Wrench, HelpCircle, Phone, Clock, CheckCircle2, Circle, Trash2 } from 'lucide-react'
 import { useLang } from '@/lib/language-context'
 import { useAuth } from '@/lib/auth-context'
@@ -163,13 +164,15 @@ export default function MarketplacePage() {
           const read = !isUnread(listing)
           const initials = listing.sellerName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 
+          const sellerPhoto = users.find((u) => u.id === listing.sellerId)?.profilePhoto
           return (
             <div key={listing.id} className={`rounded-2xl bg-white shadow-sm overflow-hidden border transition-colors ${read ? 'border-gray-100' : 'border-violet-200'}`}>
               {/* Header — seller info */}
               <div className="flex items-center gap-3 px-4 pt-3 pb-2">
-                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${config.colorClass}`}>
-                  {initials}
-                </div>
+                <Avatar className={`h-9 w-9 shrink-0 ${config.colorClass}`}>
+                  {sellerPhoto && <AvatarImage src={sellerPhoto} />}
+                  <AvatarFallback className={`text-xs font-bold ${config.colorClass}`}>{initials}</AvatarFallback>
+                </Avatar>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-semibold text-gray-900 truncate">{listing.sellerName}</span>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, ExternalLink, Plus, Pencil, Trash2, X, Check } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Plus, Pencil, Trash2, X, Check, ChevronUp, ChevronDown } from 'lucide-react'
 import { useLang } from '@/lib/language-context'
 import { useAuth } from '@/lib/auth-context'
 import { useData } from '@/lib/data-context'
@@ -27,7 +27,7 @@ const EMPTY_FORM = { name: '', platform: 'whatsapp' as GroupChat['platform'], ur
 export default function GroupChatsPage() {
   const { tr } = useLang()
   const { user } = useAuth()
-  const { chats, addChat, updateChat, deleteChat } = useData()
+  const { chats, addChat, updateChat, deleteChat, reorderChats } = useData()
 
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
 
@@ -104,7 +104,7 @@ export default function GroupChatsPage() {
 
       {/* Chat list */}
       <div className="space-y-3">
-        {chats.map((chat) => (
+        {chats.map((chat, index) => (
           <div key={chat.id}>
             {editingId === chat.id ? (
               <ChatForm
@@ -115,7 +115,25 @@ export default function GroupChatsPage() {
                 title="Edit Link"
               />
             ) : (
-              <div className="flex items-start gap-3 rounded-2xl bg-white p-4 shadow-sm border border-gray-100">
+              <div className="flex items-start gap-2 rounded-2xl bg-white p-4 shadow-sm border border-gray-100">
+                {isAdmin && (
+                  <div className="flex flex-col gap-0.5 shrink-0 mt-0.5">
+                    <button
+                      onClick={() => reorderChats(index, index - 1)}
+                      disabled={index === 0}
+                      className="p-1 rounded-md text-gray-300 hover:text-violet-600 hover:bg-violet-50 transition-colors disabled:opacity-20 disabled:pointer-events-none"
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => reorderChats(index, index + 1)}
+                      disabled={index === chats.length - 1}
+                      className="p-1 rounded-md text-gray-300 hover:text-violet-600 hover:bg-violet-50 transition-colors disabled:opacity-20 disabled:pointer-events-none"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
                 <a
                   href={chat.url}
                   target="_blank"

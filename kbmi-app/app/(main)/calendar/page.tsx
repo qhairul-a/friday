@@ -9,14 +9,14 @@ import { RSVP } from '@/lib/mock-data'
 import { useData } from '@/lib/data-context'
 import { sanitizeHtml } from '@/lib/sanitize'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import MonthCalendar from '@/components/MonthCalendar'
 import MediaCarousel from '@/components/MediaCarousel'
 
 export default function CalendarPage() {
   const { tr, lang } = useLang()
   const { user } = useAuth()
-  const { events, updateRSVP, addAuditEntry } = useData()
+  const { events, users, updateRSVP, addAuditEntry } = useData()
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
 
@@ -219,6 +219,9 @@ export default function CalendarPage() {
                         {ev.rsvps.map((r) => (
                           <div key={r.userId} className="flex items-center gap-3">
                             <Avatar className="h-7 w-7 bg-gray-100">
+                              {users.find((u) => u.id === r.userId)?.profilePhoto && (
+                                <AvatarImage src={users.find((u) => u.id === r.userId)!.profilePhoto!} />
+                              )}
                               <AvatarFallback className="text-xs text-gray-600">
                                 {r.userName.split(' ').map((w) => w[0]).join('').slice(0, 2)}
                               </AvatarFallback>

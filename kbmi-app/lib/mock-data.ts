@@ -129,6 +129,7 @@ export interface GroupChat {
   platform: 'whatsapp' | 'telegram' | 'instagram' | 'facebook' | 'youtube' | 'tiktok' | 'x' | 'other'
   url: string
   description: string
+  sortOrder: number
 }
 
 export interface FeedbackItem {
@@ -481,6 +482,7 @@ export const MOCK_CHATS: GroupChat[] = [
     platform: 'whatsapp',
     url: 'https://chat.whatsapp.com/example1',
     description: 'Kumpulan utama semua ahli KBMI. Pengumuman dan perbincangan umum.',
+    sortOrder: 0,
   },
   {
     id: 'g2',
@@ -488,6 +490,7 @@ export const MOCK_CHATS: GroupChat[] = [
     platform: 'whatsapp',
     url: 'https://chat.whatsapp.com/example2',
     description: 'Kumpulan khusus untuk ahli jawatankuasa exco 2025.',
+    sortOrder: 1,
   },
   {
     id: 'g3',
@@ -495,6 +498,7 @@ export const MOCK_CHATS: GroupChat[] = [
     platform: 'telegram',
     url: 'https://t.me/example3',
     description: 'Kumpulan untuk ahli keluarga yang tinggal di Johor.',
+    sortOrder: 2,
   },
   {
     id: 'g4',
@@ -502,6 +506,7 @@ export const MOCK_CHATS: GroupChat[] = [
     platform: 'whatsapp',
     url: 'https://chat.whatsapp.com/example4',
     description: 'Khas untuk anak-anak muda KBMI. Jom join!',
+    sortOrder: 3,
   },
 ]
 

@@ -7,7 +7,7 @@ import { ArrowLeft, Pin, MessageCircle, Heart, ChevronLeft, ChevronRight } from 
 import { useLang } from '@/lib/language-context'
 import { useData } from '@/lib/data-context'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Announcement, MediaItem } from '@/lib/mock-data'
 import { sanitizeHtml } from '@/lib/sanitize'
 
@@ -82,7 +82,7 @@ function PostMedia({ media }: { media: MediaItem[] }) {
   )
 }
 
-function PostCard({ ann, lang, tr }: { ann: Announcement; lang: string; tr: ReturnType<typeof useLang>['tr'] }) {
+function PostCard({ ann, authorPhoto, lang, tr }: { ann: Announcement; authorPhoto?: string; lang: string; tr: ReturnType<typeof useLang>['tr'] }) {
   const [liked, setLiked] = useState(false)
   const router = useRouter()
 
@@ -102,6 +102,7 @@ function PostCard({ ann, lang, tr }: { ann: Announcement; lang: string; tr: Retu
       {/* Author row */}
       <div className="flex items-center gap-3 px-4 py-3">
         <Avatar className="h-9 w-9 shrink-0">
+          {authorPhoto && <AvatarImage src={authorPhoto} />}
           <AvatarFallback className="text-xs font-bold bg-emerald-100 text-emerald-800">
             {ann.authorName.split(' ').map((w) => w[0]).join('').slice(0, 2)}
           </AvatarFallback>
@@ -189,7 +190,7 @@ function PostCard({ ann, lang, tr }: { ann: Announcement; lang: string; tr: Retu
 
 export default function AnnouncementsPage() {
   const { tr, lang } = useLang()
-  const { announcements } = useData()
+  const { announcements, users } = useData()
 
   const sorted = [...announcements].sort((a, b) => {
     if (a.isPinned && !b.isPinned) return -1
@@ -228,7 +229,7 @@ export default function AnnouncementsPage() {
       ) : (
         <div className="divide-y divide-gray-100">
           {sorted.map((ann) => (
-            <PostCard key={ann.id} ann={ann} lang={lang} tr={tr} />
+            <PostCard key={ann.id} ann={ann} authorPhoto={users.find((u) => u.id === ann.authorId)?.profilePhoto} lang={lang} tr={tr} />
           ))}
         </div>
       )}

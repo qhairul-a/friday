@@ -53,9 +53,10 @@ interface DataContextValue {
   toggleListingRead: (listingId: string, userId: string) => void
 
   chats: GroupChat[]
-  addChat: (chat: Omit<GroupChat, 'id'>) => void
-  updateChat: (id: string, updates: Partial<Omit<GroupChat, 'id'>>) => void
+  addChat: (chat: Omit<GroupChat, 'id' | 'sortOrder'>) => void
+  updateChat: (id: string, updates: Partial<Omit<GroupChat, 'id' | 'sortOrder'>>) => void
   deleteChat: (id: string) => void
+  reorderChats: (fromIndex: number, toIndex: number) => void
 
   financeStats: { collected: number; spent: number } | null
   setFinanceStats: (stats: { collected: number; spent: number } | null) => void
@@ -154,7 +155,7 @@ function mapListing(r: any): MarketplaceListing {
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapChat(r: any): GroupChat { return { id: r.id, name: r.name, platform: r.platform, url: r.url, description: r.description || '' } }
+function mapChat(r: any): GroupChat { return { id: r.id, name: r.name, platform: r.platform, url: r.url, description: r.description || '', sortOrder: r.sort_order ?? 0 } }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapExco(r: any): ExcoMember { return { id: r.id, userId: r.user_id || '', name: r.name, position: r.position, avatar: r.avatar || '', since: r.since } }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -221,7 +222,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     if (data) setListings(data.map(mapListing))
   }
   const fetchChats = async () => {
-    const { data } = await supabase.from('group_chats').select('*')
+    const { data } = await supabase.from('group_chats').select('*').order('sort_order')
     if (data) setChats(data.map(mapChat))
   }
   const fetchExco = async () => {
@@ -483,17 +484,26 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }
 
   // ── Group Chats ───────────────────────────────────────────────────────────────
-  const addChat = async (chat: Omit<GroupChat, 'id'>) => {
-    const { data } = await supabase.from('group_chats').insert({ name: chat.name, platform: chat.platform, url: chat.url, description: chat.description }).select().single()
+  const addChat = async (chat: Omit<GroupChat, 'id' | 'sortOrder'>) => {
+    const nextOrder = chats.length
+    const { data } = await supabase.from('group_chats').insert({ name: chat.name, platform: chat.platform, url: chat.url, description: chat.description, sort_order: nextOrder }).select().single()
     if (data) setChats((prev) => [...prev, mapChat(data)])
   }
-  const updateChat = async (id: string, updates: Partial<Omit<GroupChat, 'id'>>) => {
+  const updateChat = async (id: string, updates: Partial<Omit<GroupChat, 'id' | 'sortOrder'>>) => {
     await supabase.from('group_chats').update(updates).eq('id', id)
     setChats((prev) => prev.map((c) => c.id === id ? { ...c, ...updates } : c))
   }
   const deleteChat = async (id: string) => {
     setChats((prev) => prev.filter((c) => c.id !== id))
     await supabase.from('group_chats').delete().eq('id', id)
+  }
+  const reorderChats = async (fromIndex: number, toIndex: number) => {
+    const reordered = [...chats]
+    const [moved] = reordered.splice(fromIndex, 1)
+    reordered.splice(toIndex, 0, moved)
+    const updated = reordered.map((c, i) => ({ ...c, sortOrder: i }))
+    setChats(updated)
+    await Promise.all(updated.map((c) => supabase.from('group_chats').update({ sort_order: c.sortOrder }).eq('id', c.id)))
   }
 
   // ── Exco ─────────────────────────────────────────────────────────────────────
@@ -572,7 +582,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       notifications, markNotificationRead, markAllRead,
       feedback, addFeedback, markFeedbackResolved, reopenFeedback, deleteFeedback,
       listings, addListing, deleteListing, pushExpiryNotification, toggleListingRead,
-      chats, addChat, updateChat, deleteChat,
+      chats, addChat, updateChat, deleteChat, reorderChats,
       financeStats, setFinanceStats,
       excoMembers, excoTerm, setExcoTerm, addExcoMember, updateExcoMember, deleteExcoMember,
       auditLog, addAuditEntry,

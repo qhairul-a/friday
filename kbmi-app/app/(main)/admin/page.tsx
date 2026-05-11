@@ -14,7 +14,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useData } from '@/lib/data-context'
 import { supabase } from '@/lib/supabase'
 import { Announcement, Event, MediaItem, ContributionDrive, Expense, FeedbackItem, User, Poll, PollOption } from '@/lib/mock-data'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -682,6 +682,7 @@ export default function AdminPage() {
               <div key={u.id} className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm border border-gray-100">
                 <div className="relative">
                   <Avatar className="h-10 w-10 bg-emerald-100">
+                    {u.profilePhoto && <AvatarImage src={u.profilePhoto} />}
                     <AvatarFallback className="text-sm font-semibold text-emerald-800">{u.avatar}</AvatarFallback>
                   </Avatar>
                   {u.isHeadOfFamily && (

@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useData } from '@/lib/data-context'
 import { Comment } from '@/lib/mock-data'
 import { sanitizeHtml } from '@/lib/sanitize'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import MediaCarousel from '@/components/MediaCarousel'
@@ -17,7 +17,7 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
   const { id } = use(params)
   const { tr, lang } = useLang()
   const { user } = useAuth()
-  const { announcements, addComment, addAuditEntry } = useData()
+  const { announcements, users, addComment, addAuditEntry } = useData()
 
   const ann = announcements.find((a) => a.id === id)
   const [newComment, setNewComment] = useState('')
@@ -60,6 +60,9 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
       <div className="overflow-hidden rounded-2xl bg-white shadow-sm border border-gray-100">
         <div className="flex items-center gap-3 p-4 pb-3">
           <Avatar className="h-10 w-10 bg-emerald-100">
+            {users.find((u) => u.id === ann.authorId)?.profilePhoto && (
+              <AvatarImage src={users.find((u) => u.id === ann.authorId)!.profilePhoto!} />
+            )}
             <AvatarFallback className="text-sm font-semibold text-emerald-800">
               {ann.authorName.split(' ').map((w) => w[0]).join('').slice(0, 2)}
             </AvatarFallback>
@@ -110,6 +113,9 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
         {ann.comments.map((c) => (
           <div key={c.id} className="flex gap-3">
             <Avatar className="h-8 w-8 bg-gray-100 shrink-0">
+              {users.find((u) => u.id === c.authorId)?.profilePhoto && (
+                <AvatarImage src={users.find((u) => u.id === c.authorId)!.profilePhoto!} />
+              )}
               <AvatarFallback className="text-xs font-semibold text-gray-600">
                 {c.authorName.split(' ').map((w) => w[0]).join('').slice(0, 2)}
               </AvatarFallback>
@@ -126,6 +132,7 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
 
         <form onSubmit={handleComment} className="flex gap-3 items-end mt-2">
           <Avatar className="h-8 w-8 bg-emerald-100 shrink-0 mb-1">
+            {user?.profilePhoto && <AvatarImage src={user.profilePhoto} />}
             <AvatarFallback className="text-xs font-semibold text-emerald-800">{user?.avatar}</AvatarFallback>
           </Avatar>
           <div className="flex-1">
