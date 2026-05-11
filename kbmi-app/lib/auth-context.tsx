@@ -111,13 +111,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) return
     const db: Record<string, unknown> = {}
     if (updates.name !== undefined) db.name = updates.name
+    if (updates.avatar !== undefined) db.avatar = updates.avatar
     if (updates.branch !== undefined) db.branch = updates.branch
     if (updates.phone !== undefined) db.phone = updates.phone
     if (updates.address !== undefined) db.address = updates.address
     if (updates.dob !== undefined) db.dob = updates.dob
     if (updates.profilePhoto !== undefined) db.profile_photo = updates.profilePhoto
     if (updates.familyMembers !== undefined) db.family_members = updates.familyMembers
-    supabase.from('profiles').update(db).eq('id', user.id)
+    supabase.from('profiles').update(db).eq('id', user.id).then()
     setUser((prev) => prev ? { ...prev, ...updates } : prev)
   }
 
