@@ -13,6 +13,7 @@ interface DataContextValue {
   updateAnnouncement: (id: string, updates: Partial<Omit<Announcement, 'id' | 'comments'>>) => void
   deleteAnnouncement: (id: string) => void
   addComment: (announcementId: string, comment: Announcement['comments'][0]) => void
+  toggleLike: (announcementId: string, userId: string) => void
 
   events: Event[]
   addEvent: (ev: Omit<Event, 'id' | 'rsvps'>) => void
@@ -88,6 +89,7 @@ function mapAnnouncement(r: any): Announcement {
     htmlContent: r.html_content, media: r.media || [],
     authorId: r.author_id || '', authorName: r.author_name || '',
     createdAt: r.created_at || '', isPinned: r.is_pinned || false,
+    likedBy: r.liked_by || [],
     comments: (r.comments || []).map(mapComment),
   }
 }
@@ -272,6 +274,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const deleteAnnouncement = async (id: string) => {
     setAnnouncements((prev) => prev.filter((a) => a.id !== id))
     await supabase.from('announcements').delete().eq('id', id)
+  }
+  const toggleLike = async (announcementId: string, userId: string) => {
+    const ann = announcements.find((a) => a.id === announcementId)
+    if (!ann) return
+    const newLikedBy = ann.likedBy.includes(userId)
+      ? ann.likedBy.filter((id) => id !== userId)
+      : [...ann.likedBy, userId]
+    setAnnouncements((prev) => prev.map((a) => a.id === announcementId ? { ...a, likedBy: newLikedBy } : a))
+    await supabase.from('announcements').update({ liked_by: newLikedBy }).eq('id', announcementId)
   }
   const addComment = async (announcementId: string, comment: Announcement['comments'][0]) => {
     await supabase.from('comments').insert({
@@ -575,7 +586,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <DataContext.Provider value={{
-      announcements, addAnnouncement, updateAnnouncement, deleteAnnouncement, addComment,
+      announcements, addAnnouncement, updateAnnouncement, deleteAnnouncement, addComment, toggleLike,
       events, addEvent, updateEvent, deleteEvent, updateRSVP,
       users, toggleHeadOfFamily, setUserRole, deleteUser, updateUserById,
       drives, addDrive, updateDrive, toggleDriveStatus, confirmContribution, toggleContributionConfirm, recordContribution, removeContribution, addExpense,

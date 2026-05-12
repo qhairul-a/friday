@@ -33,6 +33,7 @@ export interface Announcement {
   authorName: string
   createdAt: string
   isPinned: boolean
+  likedBy: string[]
   comments: Comment[]
 }
 
@@ -236,6 +237,7 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     authorName: 'Ahmad Razif Mat Indra',
     createdAt: '2025-03-10',
     isPinned: true,
+    likedBy: [],
     comments: [
       {
         id: 'c1',
@@ -265,6 +267,7 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     authorName: 'Siti Hajar Bte Yusof',
     createdAt: '2025-01-15',
     isPinned: false,
+    likedBy: [],
     comments: [
       {
         id: 'c3',
@@ -285,6 +288,7 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     authorName: 'Ahmad Razif Mat Indra',
     createdAt: '2025-01-05',
     isPinned: false,
+    likedBy: [],
     comments: [],
   },
 ]

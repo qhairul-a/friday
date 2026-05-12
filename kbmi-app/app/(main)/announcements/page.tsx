@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Pin, MessageCircle, Heart, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useLang } from '@/lib/language-context'
+import { useAuth } from '@/lib/auth-context'
 import { useData } from '@/lib/data-context'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -82,8 +83,8 @@ function PostMedia({ media }: { media: MediaItem[] }) {
   )
 }
 
-function PostCard({ ann, authorPhoto, lang, tr }: { ann: Announcement; authorPhoto?: string; lang: string; tr: ReturnType<typeof useLang>['tr'] }) {
-  const [liked, setLiked] = useState(false)
+function PostCard({ ann, authorPhoto, userId, onToggleLike, lang, tr }: { ann: Announcement; authorPhoto?: string; userId: string; onToggleLike: (id: string) => void; lang: string; tr: ReturnType<typeof useLang>['tr'] }) {
+  const liked = ann.likedBy.includes(userId)
   const router = useRouter()
 
   const hasStorageMedia = ann.media && ann.media.length > 0
@@ -133,20 +134,27 @@ function PostCard({ ann, authorPhoto, lang, tr }: { ann: Announcement; authorPho
       )}
 
       {/* Actions */}
-      <div className="flex items-center gap-4 px-4 pt-3 pb-1">
+      <div className="flex items-center gap-5 px-4 pt-3 pb-1">
         <button
-          onClick={(e) => { e.stopPropagation(); setLiked((v) => !v) }}
-          className={`transition-colors ${liked ? 'text-red-500' : 'text-gray-700 hover:text-red-400'}`}
+          onClick={(e) => { e.stopPropagation(); onToggleLike(ann.id) }}
+          className={`flex items-center gap-1.5 transition-colors ${liked ? 'text-red-500' : 'text-gray-700 hover:text-red-400'}`}
           aria-label="Like"
         >
           <Heart className={`h-6 w-6 ${liked ? 'fill-red-500' : ''}`} />
+          {ann.likedBy.length > 0 && (
+            <span className="text-sm font-medium">{ann.likedBy.length}</span>
+          )}
         </button>
         <Link
           href={`/announcements/${ann.id}`}
-          className="text-gray-700 hover:text-gray-500 transition-colors"
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center gap-1.5 text-gray-700 hover:text-gray-500 transition-colors"
           aria-label="Comment"
         >
           <MessageCircle className="h-6 w-6" />
+          {ann.comments.length > 0 && (
+            <span className="text-sm font-medium">{ann.comments.length}</span>
+          )}
         </Link>
       </div>
 
@@ -190,7 +198,8 @@ function PostCard({ ann, authorPhoto, lang, tr }: { ann: Announcement; authorPho
 
 export default function AnnouncementsPage() {
   const { tr, lang } = useLang()
-  const { announcements, users } = useData()
+  const { user } = useAuth()
+  const { announcements, users, toggleLike } = useData()
 
   const sorted = [...announcements].sort((a, b) => {
     if (a.isPinned && !b.isPinned) return -1
@@ -229,7 +238,7 @@ export default function AnnouncementsPage() {
       ) : (
         <div className="divide-y divide-gray-100">
           {sorted.map((ann) => (
-            <PostCard key={ann.id} ann={ann} authorPhoto={users.find((u) => u.id === ann.authorId)?.profilePhoto} lang={lang} tr={tr} />
+            <PostCard key={ann.id} ann={ann} authorPhoto={users.find((u) => u.id === ann.authorId)?.profilePhoto} userId={user?.id ?? ''} onToggleLike={(id) => user && toggleLike(id, user.id)} lang={lang} tr={tr} />
           ))}
         </div>
       )}

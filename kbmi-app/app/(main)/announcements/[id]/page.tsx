@@ -17,11 +17,11 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
   const { id } = use(params)
   const { tr, lang } = useLang()
   const { user } = useAuth()
-  const { announcements, users, addComment, addAuditEntry } = useData()
+  const { announcements, users, addComment, toggleLike, addAuditEntry } = useData()
 
   const ann = announcements.find((a) => a.id === id)
   const [newComment, setNewComment] = useState('')
-  const [liked, setLiked] = useState(false)
+  const liked = ann ? ann.likedBy.includes(user?.id ?? '') : false
 
   if (!ann) {
     return (
@@ -88,11 +88,12 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
 
           <div className="mt-4 flex items-center gap-4 border-t border-gray-100 pt-3">
             <button
-              onClick={() => setLiked(!liked)}
+              onClick={() => user && toggleLike(ann.id, user.id)}
               className={`flex items-center gap-1.5 text-sm transition-colors ${liked ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}
             >
               <Heart className={`h-4 w-4 ${liked ? 'fill-red-500' : ''}`} />
               <span className="text-xs">{liked ? (lang === 'en' ? 'Liked' : 'Disukai') : 'Like'}</span>
+              {ann.likedBy.length > 0 && <span className="text-xs">· {ann.likedBy.length}</span>}
             </button>
             <span className="text-xs text-gray-400">{ann.comments.length} {tr.comments}</span>
           </div>
