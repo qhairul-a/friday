@@ -34,7 +34,7 @@ export default function ContributionsPage() {
   const myAmount = scores[user?.id || ''] || 0
   const allEntries = drives.flatMap((d) => d.contributions.filter((c) => c.confirmed))
   const avgPerContrib = allEntries.length > 0 ? grandTotal / allEntries.length : 0
-  const vsAvgContribPct = avgPerContrib > 0 ? (myAmount / avgPerContrib) * 100 : 0
+  const diffFromAvg = Math.round(myAmount - avgPerContrib)
 
   const activeDrive = visibleDrives.find((d) => d.status === 'active')
   const closedDrives = visibleDrives.filter((d) => d.status === 'closed')
@@ -84,10 +84,23 @@ export default function ContributionsPage() {
               {lang === 'en' ? 'of total collected' : 'drpd. jumlah dikutip'}
             </div>
           </div>
-          <div className="rounded-xl bg-white/10 px-3 py-2.5">
-            <div className="text-2xl font-bold">{vsAvgContribPct.toFixed(1)}%</div>
-            <div className="text-xs opacity-75 mt-0.5">
-              {lang === 'en' ? 'of avg. contribution amount' : 'drpd. purata sumbangan'}
+          <div className={`rounded-xl px-3 py-2.5 ${
+            diffFromAvg >= 1
+              ? 'bg-blue-200 text-blue-900'
+              : diffFromAvg < 0
+              ? 'bg-red-100 text-red-900'
+              : 'bg-white text-gray-700'
+          }`}>
+            <div className="text-xs font-medium mb-1 opacity-80">
+              {lang === 'en' ? 'You have contributed' : 'Anda telah menyumbang'}
+            </div>
+            <div className="text-2xl font-bold">
+              {diffFromAvg > 0 ? '+' : ''}{diffFromAvg < 0 ? '-' : ''}${Math.abs(diffFromAvg)}
+            </div>
+            <div className="text-xs mt-0.5 opacity-75">
+              {lang === 'en'
+                ? diffFromAvg >= 1 ? 'more than avg. contribution' : diffFromAvg < 0 ? 'less than avg. contribution' : 'equal to avg. contribution'
+                : diffFromAvg >= 1 ? 'lebih drpd. purata' : diffFromAvg < 0 ? 'kurang drpd. purata' : 'sama dgn. purata'}
             </div>
           </div>
         </div>
