@@ -1927,11 +1927,6 @@ export default function AdminPage() {
                       <label className="mb-1 block text-xs font-medium text-gray-600">{lang === 'en' ? 'Contact Number' : 'Nombor Telefon'}</label>
                       <Input value={editUserForm.phone} onChange={(e) => setEditUserForm((f) => ({ ...f, phone: e.target.value }))} className="h-10" />
                     </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-600">{lang === 'en' ? 'Home Address' : 'Alamat Rumah'}</label>
-                      <Textarea value={editUserForm.address} onChange={(e) => setEditUserForm((f) => ({ ...f, address: e.target.value }))} rows={2} className="resize-none" />
-                    </div>
-
                     {/* Family members */}
                     <div>
                       <label className="mb-2 block text-xs font-medium text-gray-600">{lang === 'en' ? 'Family Members' : 'Ahli Keluarga'}</label>
