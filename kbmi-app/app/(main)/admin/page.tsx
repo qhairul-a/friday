@@ -2057,8 +2057,8 @@ export default function AdminPage() {
                     )}
                   </div>
 
-                  {/* Contribution stats */}
-                  {(() => {
+                  {/* Contribution stats — super admin only */}
+                  {isSuperAdmin && (() => {
                     const scores = computeScores(users, drives)
                     const grandTotal = Object.values(scores).reduce((s, v) => s + v, 0)
                     const allEntries = drives.flatMap((d) => d.contributions.filter((c) => c.confirmed))
