@@ -13,7 +13,7 @@ import { useLang } from '@/lib/language-context'
 import { useAuth } from '@/lib/auth-context'
 import { useData } from '@/lib/data-context'
 import { supabase } from '@/lib/supabase'
-import { Announcement, Event, MediaItem, ContributionDrive, Expense, FeedbackItem, User, Poll, PollOption } from '@/lib/mock-data'
+import { Announcement, Event, MediaItem, ContributionDrive, Expense, FeedbackItem, User, Poll, PollOption, computeScores } from '@/lib/mock-data'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -2034,17 +2034,6 @@ export default function AdminPage() {
                         <span>{selectedUser.dob}</span>
                       </div>
                     ) : null}
-                    {selectedUser.address ? (
-                      <div className="flex items-start gap-2 text-sm text-gray-700">
-                        <MapPin className="h-3.5 w-3.5 text-gray-400 shrink-0 mt-0.5" />
-                        <span className="whitespace-pre-line">{selectedUser.address}</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-sm text-gray-400 italic">
-                        <MapPin className="h-3.5 w-3.5 shrink-0" />
-                        <span>{lang === 'en' ? 'No address provided' : 'Tiada alamat'}</span>
-                      </div>
-                    )}
                   </div>
 
                   {/* Family members */}
@@ -2072,6 +2061,42 @@ export default function AdminPage() {
                       </p>
                     )}
                   </div>
+
+                  {/* Contribution stats */}
+                  {(() => {
+                    const scores = computeScores(users, drives)
+                    const grandTotal = Object.values(scores).reduce((s, v) => s + v, 0)
+                    const allEntries = drives.flatMap((d) => d.contributions.filter((c) => c.confirmed))
+                    const avgPerContrib = allEntries.length > 0 ? grandTotal / allEntries.length : 0
+                    const userAmount = scores[selectedUser.id] || 0
+                    const pct = grandTotal > 0 ? (userAmount / grandTotal) * 100 : 0
+                    const diffFromAvg = Math.round(userAmount - avgPerContrib)
+                    return (
+                      <div>
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                          {lang === 'en' ? 'Contribution Data' : 'Data Sumbangan'}
+                        </h4>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2.5">
+                            <div className="text-lg font-bold text-emerald-800">{pct.toFixed(1)}%</div>
+                            <div className="text-xs text-emerald-600 mt-0.5">
+                              {lang === 'en' ? 'of total collected' : 'drpd. jumlah dikutip'}
+                            </div>
+                          </div>
+                          <div className={`rounded-xl px-3 py-2.5 ${
+                            diffFromAvg >= 1 ? 'bg-blue-100 border border-blue-200' : diffFromAvg < 0 ? 'bg-red-50 border border-red-100' : 'bg-gray-50 border border-gray-200'
+                          }`}>
+                            <div className={`text-xs font-medium mb-1 ${diffFromAvg >= 1 ? 'text-blue-700' : diffFromAvg < 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                              {lang === 'en' ? 'vs avg. contribution' : 'vs purata sumbangan'}
+                            </div>
+                            <div className={`text-lg font-bold ${diffFromAvg >= 1 ? 'text-blue-800' : diffFromAvg < 0 ? 'text-red-700' : 'text-gray-700'}`}>
+                              {diffFromAvg > 0 ? '+' : ''}{diffFromAvg < 0 ? '-' : ''}${Math.abs(diffFromAvg)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })()}
 
                   {isSuperAdmin && selectedUser.id !== user?.id ? (
                     <div className="flex gap-2">
