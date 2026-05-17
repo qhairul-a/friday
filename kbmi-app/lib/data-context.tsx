@@ -78,6 +78,9 @@ interface DataContextValue {
   updatePoll: (id: string, updates: Partial<Omit<Poll, 'id' | 'createdAt'>>) => void
   deletePoll: (id: string) => void
   votePoll: (pollId: string, optionIds: string[], userId: string) => void
+
+  welcomeMessage: { title: string; body: string } | null
+  saveWelcomeMessage: (msg: { title: string; body: string } | null) => Promise<void>
 }
 
 const DataContext = createContext<DataContextValue | null>(null)
@@ -192,11 +195,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [excoTerm, setExcoTermState] = useState('Term 2025')
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([])
   const [polls, setPolls] = useState<Poll[]>([])
+  const DEFAULT_WELCOME = { title: 'Welcome to KBMI Hub! 🏡', body: "We're so glad you're here.\n\nThis is your family's very own digital home. Whether you're here to catch up on the latest news, join an upcoming event, or simply stay close to the people who matter most — you belong here.\n\nWelcome home. Let's grow together." }
+  const [welcomeMessage, setWelcomeMsgState] = useState<{ title: string; body: string } | null>(DEFAULT_WELCOME)
 
   useEffect(() => {
     fetchAnnouncements(); fetchEvents(); fetchUsers(); fetchDrives()
     fetchFeedback(); fetchListings(); fetchChats(); fetchExco()
-    fetchAuditLog(); fetchPolls(); fetchExcoTerm()
+    fetchAuditLog(); fetchPolls(); fetchExcoTerm(); fetchWelcomeMessage()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Fetchers ────────────────────────────────────────────────────────────────
@@ -590,6 +595,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     await fetchPolls()
   }
 
+  const fetchWelcomeMessage = async () => {
+    const { data } = await supabase.from('app_settings').select('value').eq('key', 'welcome_message').single()
+    if (data) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const v = data.value as any
+      setWelcomeMsgState(v.deleted ? null : { title: v.title || '', body: v.body || '' })
+    }
+  }
+  const saveWelcomeMessage = async (msg: { title: string; body: string } | null) => {
+    setWelcomeMsgState(msg)
+    const value = msg ? { title: msg.title, body: msg.body } : { deleted: true }
+    await supabase.from('app_settings').upsert({ key: 'welcome_message', value })
+  }
+
   return (
     <DataContext.Provider value={{
       announcements, addAnnouncement, updateAnnouncement, deleteAnnouncement, addComment, toggleLike,
@@ -604,6 +623,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       excoMembers, excoTerm, setExcoTerm, addExcoMember, updateExcoMember, deleteExcoMember,
       auditLog, addAuditEntry,
       polls, addPoll, updatePoll, deletePoll, votePoll,
+      welcomeMessage, saveWelcomeMessage,
     }}>
       {children}
     </DataContext.Provider>
