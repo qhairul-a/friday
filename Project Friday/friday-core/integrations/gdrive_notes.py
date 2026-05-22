@@ -1,0 +1,203 @@
+"""
+Google Drive-based notes integration for Friday.
+Drop-in replacement for integrations/obsidian.py.
+
+Notes are stored as .md files inside the 'Friday' subfolder of your Obsidian
+vault folder in Google Drive (e.g. Q _obsidian/Friday/).
+Files stay fully compatible with the Obsidian app.
+"""
+
+import io
+import os
+import re
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+
+# ─── Auth ─────────────────────────────────────────────────────────────────────
+
+def _get_service():
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request
+    from googleapiclient.discovery import build
+
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET_FILE", "")
+    token_file = os.environ.get(
+        "GDRIVE_NOTES_TOKEN_FILE",
+        os.path.join(os.path.dirname(client_secret), "gdrive_notes_token.json")
+        if client_secret else "gdrive_notes_token.json",
+    )
+
+    if not os.path.exists(token_file):
+        raise RuntimeError(
+            f"Google Drive not authorized for notes. Run:\n"
+            f"  python scripts/authorize_gdrive_notes.py\n"
+            f"Expected token file: {token_file}"
+        )
+
+    scopes = ["https://www.googleapis.com/auth/drive"]
+    creds = Credentials.from_authorized_user_file(token_file, scopes)
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        with open(token_file, "w") as f:
+            f.write(creds.to_json())
+
+    return build("drive", "v3", credentials=creds)
+
+
+# ─── Folder discovery ─────────────────────────────────────────────────────────
+
+def _get_friday_folder_id(service) -> str:
+    """
+    Returns the Google Drive folder ID for the Friday notes folder.
+    Checks GDRIVE_NOTES_FOLDER_ID env var first (fast path).
+    Otherwise discovers it by searching for the vault → Friday subfolder.
+    Prints the ID so the user can save it to .env for future runs.
+    """
+    folder_id = os.environ.get("GDRIVE_NOTES_FOLDER_ID", "").strip()
+    if folder_id:
+        return folder_id
+
+    vault_name = os.environ.get("GDRIVE_VAULT_NAME", "Q _obsidian")
+
+    # Find the vault folder
+    result = service.files().list(
+        q=f"name='{vault_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false",
+        fields="files(id, name)",
+        pageSize=5,
+    ).execute()
+    vault_folders = result.get("files", [])
+    if not vault_folders:
+        raise RuntimeError(
+            f"Google Drive folder '{vault_name}' not found. "
+            f"Check GDRIVE_VAULT_NAME in your .env."
+        )
+    vault_id = vault_folders[0]["id"]
+
+    # Find or create Friday subfolder
+    result = service.files().list(
+        q=(
+            f"name='Friday' and mimeType='application/vnd.google-apps.folder' "
+            f"and '{vault_id}' in parents and trashed=false"
+        ),
+        fields="files(id, name)",
+        pageSize=5,
+    ).execute()
+    friday_folders = result.get("files", [])
+
+    if friday_folders:
+        friday_id = friday_folders[0]["id"]
+    else:
+        # Create Friday folder inside vault
+        meta = {
+            "name": "Friday",
+            "mimeType": "application/vnd.google-apps.folder",
+            "parents": [vault_id],
+        }
+        folder = service.files().create(body=meta, fields="id").execute()
+        friday_id = folder["id"]
+        print(f"[gdrive_notes] Created Friday folder in '{vault_name}'.")
+
+    print(
+        f"[gdrive_notes] Friday folder ID: {friday_id}\n"
+        f"  Add to .env for faster startup:\n"
+        f"  GDRIVE_NOTES_FOLDER_ID={friday_id}"
+    )
+    return friday_id
+
+
+# ─── Public API ───────────────────────────────────────────────────────────────
+
+def _safe_filename(text: str) -> str:
+    return re.sub(r'[<>:"/\\|?*\n\r]', "", text).strip()[:50]
+
+
+def write_note(title: str, content: str) -> str:
+    """Upload a new markdown note to the Friday folder in Google Drive."""
+    from googleapiclient.http import MediaIoBaseUpload
+
+    tz = ZoneInfo(os.environ.get("TIMEZONE", "Asia/Singapore"))
+    now = datetime.now(tz)
+    timestamp_str = now.strftime("%Y-%m-%d %H%M")
+    display_ts = now.strftime("%Y-%m-%d %H:%M")
+
+    safe_title = _safe_filename(title)
+    filename = f"{timestamp_str} {safe_title}.md"
+    body = f"# {title}\n\n{content}\n\n---\n*Captured by Friday · {display_ts}*\n"
+
+    service = _get_service()
+    folder_id = _get_friday_folder_id(service)
+
+    file_meta = {"name": filename, "parents": [folder_id]}
+    media = MediaIoBaseUpload(
+        io.BytesIO(body.encode("utf-8")),
+        mimetype="text/plain",
+        resumable=False,
+    )
+    service.files().create(body=file_meta, media_body=media, fields="id").execute()
+    return filename
+
+
+def search_notes(query: str, max_results: int = 5) -> str:
+    """Search notes in the Friday folder using Google Drive full-text search."""
+    from googleapiclient.http import MediaIoBaseDownload
+
+    keywords = [kw.lower() for kw in query.split() if len(kw) > 2]
+    if not keywords:
+        return "Please provide a search term."
+
+    service = _get_service()
+    folder_id = _get_friday_folder_id(service)
+
+    # Collect unique file matches across all keywords
+    seen: dict[str, dict] = {}
+    for kw in keywords[:3]:  # cap API calls
+        # Escape single quotes in keyword for Drive query
+        safe_kw = kw.replace("'", "\\'")
+        result = service.files().list(
+            q=(
+                f"'{folder_id}' in parents "
+                f"and fullText contains '{safe_kw}' "
+                f"and trashed=false"
+            ),
+            fields="files(id, name, modifiedTime)",
+            orderBy="modifiedTime desc",
+            pageSize=10,
+        ).execute()
+        for f in result.get("files", []):
+            if f["id"] not in seen:
+                seen[f["id"]] = f
+
+    if not seen:
+        return f"No notes found matching '{query}'."
+
+    # Sort by most recent, cap results
+    files = sorted(seen.values(), key=lambda x: x["modifiedTime"], reverse=True)
+    files = files[:max_results]
+
+    lines = [f"Found {len(files)} note(s) for '{query}':\n"]
+    for f in files:
+        # Download file content for snippet
+        try:
+            request = service.files().get_media(fileId=f["id"])
+            buf = io.BytesIO()
+            downloader = MediaIoBaseDownload(buf, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+            content = buf.getvalue().decode("utf-8", errors="replace")
+        except Exception:
+            content = ""
+
+        # Strip heading and frontmatter for snippet
+        snippet_lines = [
+            ln for ln in content.splitlines()
+            if ln.strip() and not ln.startswith("#") and not ln.startswith("---")
+        ]
+        snippet = " ".join(snippet_lines)[:150]
+
+        # Clean up display title (remove timestamp prefix)
+        display_title = re.sub(r"^\d{4}-\d{2}-\d{2} \d{4} ", "", f["name"].removesuffix(".md"))
+        lines.append(f"— {display_title}\n  {snippet}{'…' if len(snippet) == 150 else ''}\n")
+
+    return "\n".join(lines).strip()

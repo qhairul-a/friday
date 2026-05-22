@@ -1,0 +1,33 @@
+# Environment
+.env
+.env.*
+
+# Google credentials & tokens — never commit these
+*.json
+*.pickle
+*_token.json
+*_token.pickle
+google_tts_key.json
+google_token.pickle
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
