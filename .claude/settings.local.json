@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx next *)"
+      "Bash(npx next *)",
+      "Bash(cd \"/c/Users/qhair/OneDrive/Desktop/Claude\" && find . -maxdepth 2 -type f -name \"package.json\" -o -name \"CLAUDE.md\" -o -name \"README.md\" 2>/dev/null | head -10)",
+      "Read(//c/c/Users/qhair/OneDrive/Desktop/**)",
+      "Bash(cd \"/c/Users/qhair/OneDrive/Desktop/Claude\" && ls -la)",
+      "Bash(git reset *)",
+      "Bash(git add *)"
     ]
   }
 }
