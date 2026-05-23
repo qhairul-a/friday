@@ -6,6 +6,8 @@ import { supabase, USER_ID } from "@/lib/supabase";
 import { Task, RoutineItem, Goal } from "@/lib/types";
 import DashboardHeader from "./components/dashboard-header";
 import VoiceOrb from "./components/voice-orb";
+import MobileSwipePanels from "./components/mobile-swipe-panels";
+import MobileBottomNav from "./components/mobile-bottom-nav";
 
 const PRIORITY_WEIGHT = { high: 3, normal: 2, low: 1 } as const;
 const STATUS_WEIGHT = { in_progress: 2, todo: 1, done: 0, archived: 0 } as const;
@@ -253,35 +255,90 @@ function GoalsWidget() {
 export default function Dashboard() {
   return (
     <div className="h-screen bg-[#050b14] text-white flex flex-col overflow-hidden">
-      <DashboardHeader />
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left sidebar */}
-        <aside className="w-72 border-r border-[#1a3a5c] overflow-y-auto p-3 bg-[#06101e] shrink-0">
-          <CalendarWidget />
-          <TasksWidget />
-        </aside>
+      {/* ── DESKTOP LAYOUT (≥ 768px) ──────────────────────────────────── */}
+      <div className="hidden md:flex flex-col flex-1 overflow-hidden">
+        <DashboardHeader />
 
-        {/* Center — voice orb */}
-        <main className="flex-1 flex items-center justify-center bg-[#050b14] relative overflow-hidden">
-          <div
-            className="absolute inset-0 opacity-[0.03]"
-            style={{
-              backgroundImage: "linear-gradient(#00d4ff 1px, transparent 1px), linear-gradient(90deg, #00d4ff 1px, transparent 1px)",
-              backgroundSize: "40px 40px",
-            }}
-          />
-          <div className="relative z-10">
-            <VoiceOrb autoConnect />
-          </div>
-        </main>
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left sidebar */}
+          <aside className="w-72 border-r border-[#1a3a5c] overflow-y-auto p-3 bg-[#06101e] shrink-0">
+            <CalendarWidget />
+            <TasksWidget />
+          </aside>
 
-        {/* Right sidebar */}
-        <aside className="w-72 border-l border-[#1a3a5c] overflow-y-auto p-3 bg-[#06101e] shrink-0">
-          <RoutineWidget />
-          <GoalsWidget />
-        </aside>
+          {/* Center — voice orb */}
+          <main className="flex-1 flex items-center justify-center bg-[#050b14] relative overflow-hidden">
+            <div
+              className="absolute inset-0 opacity-[0.03]"
+              style={{
+                backgroundImage: "linear-gradient(#00d4ff 1px, transparent 1px), linear-gradient(90deg, #00d4ff 1px, transparent 1px)",
+                backgroundSize: "40px 40px",
+              }}
+            />
+            <div className="relative z-10">
+              <VoiceOrb autoConnect />
+            </div>
+          </main>
+
+          {/* Right sidebar */}
+          <aside className="w-72 border-l border-[#1a3a5c] overflow-y-auto p-3 bg-[#06101e] shrink-0">
+            <RoutineWidget />
+            <GoalsWidget />
+          </aside>
+        </div>
       </div>
+
+      {/* ── MOBILE LAYOUT (< 768px) ───────────────────────────────────── */}
+      <div className="flex flex-col md:hidden flex-1 overflow-hidden bg-[#050b14]">
+
+        {/* Centered branding */}
+        <div className="flex flex-col items-center pt-8 pb-2 shrink-0">
+          <span className="text-base font-bold tracking-[0.3em] text-[#00d4ff]">
+            F.R.I.D.A.Y
+          </span>
+          <span className="text-[9px] text-[#4a7a9b] tracking-widest mt-1 uppercase text-center px-4">
+            Fully Responsive Intelligent Digital Assistant For You
+          </span>
+        </div>
+
+        {/* 3-panel swiper */}
+        <MobileSwipePanels
+          initialPanel={1}
+          panels={[
+            // Panel 0 — Calendar + Tasks
+            <div key="left" className="px-3 pt-3 pb-16 space-y-3">
+              <CalendarWidget />
+              <TasksWidget />
+            </div>,
+
+            // Panel 1 — Voice orb (hero)
+            <div key="center" className="flex flex-col items-center justify-center h-full pb-12">
+              {/* Grid background */}
+              <div
+                className="absolute inset-0 opacity-[0.03] pointer-events-none"
+                style={{
+                  backgroundImage: "linear-gradient(#00d4ff 1px, transparent 1px), linear-gradient(90deg, #00d4ff 1px, transparent 1px)",
+                  backgroundSize: "40px 40px",
+                }}
+              />
+              <div className="relative z-10" style={{ transform: "scale(0.78)", transformOrigin: "center center" }}>
+                <VoiceOrb autoConnect />
+              </div>
+            </div>,
+
+            // Panel 2 — Routine + Goals
+            <div key="right" className="px-3 pt-3 pb-16 space-y-3">
+              <RoutineWidget />
+              <GoalsWidget />
+            </div>,
+          ]}
+        />
+
+        {/* Bottom nav — hidden until swipe-up */}
+        <MobileBottomNav />
+      </div>
+
     </div>
   );
 }

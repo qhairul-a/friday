@@ -58,7 +58,7 @@ export default function DashboardHeader({ activeTab }: { activeTab?: string }) {
   const date = now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
   return (
-    <header className="h-16 border-b border-[#1a3a5c] flex items-center px-6 shrink-0 bg-[#07101f]">
+    <header className="hidden md:flex h-16 border-b border-[#1a3a5c] items-center px-6 shrink-0 bg-[#07101f]">
       {/* Left — branding */}
       <div className="flex items-center gap-3 w-64 shrink-0">
         <Link href="/" className="text-base font-bold tracking-[0.25em] text-[#00d4ff] hover:text-white transition-colors">

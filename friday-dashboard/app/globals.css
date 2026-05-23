@@ -24,3 +24,10 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Mobile: prevent horizontal scroll bleed from swipe panels */
+@media (max-width: 767px) {
+  body {
+    overflow-x: hidden;
+  }
+}
