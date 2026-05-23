@@ -252,10 +252,15 @@ function GoalsWidget() {
 
 // ─── Main dashboard ───────────────────────────────────────────────────────────
 
+const GRID_BG = {
+  backgroundImage: "linear-gradient(#00d4ff 1px, transparent 1px), linear-gradient(90deg, #00d4ff 1px, transparent 1px)",
+  backgroundSize: "40px 40px",
+};
+
 export default function Dashboard() {
-  // Detect mobile after mount so only ONE VoiceOrb ever auto-connects.
-  // CSS hides/shows layouts but both would render JS — this prevents double
-  // LiveKit connections which crash the browser tab.
+  // Detect viewport ONCE after mount and render only ONE layout.
+  // Using CSS to show/hide both layouts simultaneously caused duplicate
+  // Supabase channel subscriptions and double LiveKit connections — both crash.
   const [isMobile, setIsMobile] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -266,91 +271,82 @@ export default function Dashboard() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  return (
-    <div className="h-screen bg-[#050b14] text-white flex flex-col overflow-hidden">
+  // Brief loading state while viewport is detected (one frame)
+  if (isMobile === null) {
+    return (
+      <div className="h-screen bg-[#050b14] flex items-center justify-center">
+        <span className="text-[10px] text-[#1a3a5c] uppercase tracking-widest">Loading…</span>
+      </div>
+    );
+  }
 
-      {/* ── DESKTOP LAYOUT (≥ 768px) ──────────────────────────────────── */}
-      <div className="hidden md:flex flex-col flex-1 overflow-hidden">
+  // ── DESKTOP LAYOUT (≥ 768px) ────────────────────────────────────────────────
+  if (!isMobile) {
+    return (
+      <div className="h-screen bg-[#050b14] text-white flex flex-col overflow-hidden">
         <DashboardHeader />
 
         <div className="flex-1 flex overflow-hidden">
-          {/* Left sidebar */}
           <aside className="w-72 border-r border-[#1a3a5c] overflow-y-auto p-3 bg-[#06101e] shrink-0">
             <CalendarWidget />
             <TasksWidget />
           </aside>
 
-          {/* Center — voice orb (only mounts when confirmed desktop) */}
           <main className="flex-1 flex items-center justify-center bg-[#050b14] relative overflow-hidden">
-            <div
-              className="absolute inset-0 opacity-[0.03]"
-              style={{
-                backgroundImage: "linear-gradient(#00d4ff 1px, transparent 1px), linear-gradient(90deg, #00d4ff 1px, transparent 1px)",
-                backgroundSize: "40px 40px",
-              }}
-            />
+            <div className="absolute inset-0 opacity-[0.03]" style={GRID_BG} />
             <div className="relative z-10">
-              {isMobile === false && <VoiceOrb autoConnect />}
+              <VoiceOrb autoConnect />
             </div>
           </main>
 
-          {/* Right sidebar */}
           <aside className="w-72 border-l border-[#1a3a5c] overflow-y-auto p-3 bg-[#06101e] shrink-0">
             <RoutineWidget />
             <GoalsWidget />
           </aside>
         </div>
       </div>
+    );
+  }
 
-      {/* ── MOBILE LAYOUT (< 768px) ───────────────────────────────────── */}
-      <div className="flex flex-col md:hidden flex-1 overflow-hidden bg-[#050b14]">
-
-        {/* Centered branding */}
-        <div className="flex flex-col items-center pt-8 pb-2 shrink-0">
-          <span className="text-base font-bold tracking-[0.3em] text-[#00d4ff]">
-            F.R.I.D.A.Y
-          </span>
-          <span className="text-[9px] text-[#4a7a9b] tracking-widest mt-1 uppercase text-center px-4">
-            Fully Responsive Intelligent Digital Assistant For You
-          </span>
-        </div>
-
-        {/* 3-panel swiper */}
-        <MobileSwipePanels
-          initialPanel={1}
-          panels={[
-            // Panel 0 — Calendar + Tasks
-            <div key="left" className="px-3 pt-3 pb-16 space-y-3">
-              <CalendarWidget />
-              <TasksWidget />
-            </div>,
-
-            // Panel 1 — Voice orb (only mounts when confirmed mobile)
-            <div key="center" className="relative flex flex-col items-center justify-center h-full pb-12">
-              <div
-                className="absolute inset-0 opacity-[0.03] pointer-events-none"
-                style={{
-                  backgroundImage: "linear-gradient(#00d4ff 1px, transparent 1px), linear-gradient(90deg, #00d4ff 1px, transparent 1px)",
-                  backgroundSize: "40px 40px",
-                }}
-              />
-              <div className="relative z-10" style={{ transform: "scale(0.78)", transformOrigin: "center center" }}>
-                {isMobile === true && <VoiceOrb autoConnect />}
-              </div>
-            </div>,
-
-            // Panel 2 — Routine + Goals
-            <div key="right" className="px-3 pt-3 pb-16 space-y-3">
-              <RoutineWidget />
-              <GoalsWidget />
-            </div>,
-          ]}
-        />
-
-        {/* Bottom nav — hidden until swipe-up */}
-        <MobileBottomNav />
+  // ── MOBILE LAYOUT (< 768px) ─────────────────────────────────────────────────
+  return (
+    <div className="h-screen bg-[#050b14] text-white flex flex-col overflow-hidden">
+      {/* Centered branding */}
+      <div className="flex flex-col items-center pt-8 pb-2 shrink-0">
+        <span className="text-base font-bold tracking-[0.3em] text-[#00d4ff]">
+          F.R.I.D.A.Y
+        </span>
+        <span className="text-[9px] text-[#4a7a9b] tracking-widest mt-1 uppercase text-center px-4">
+          Fully Responsive Intelligent Digital Assistant For You
+        </span>
       </div>
 
+      <MobileSwipePanels
+        initialPanel={1}
+        panels={[
+          // Panel 0 — Calendar + Tasks
+          <div key="left" className="px-3 pt-3 pb-16 space-y-3">
+            <CalendarWidget />
+            <TasksWidget />
+          </div>,
+
+          // Panel 1 — Voice orb (hero)
+          <div key="center" className="relative flex flex-col items-center justify-center h-full pb-12">
+            <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={GRID_BG} />
+            <div className="relative z-10" style={{ transform: "scale(0.78)", transformOrigin: "center center" }}>
+              <VoiceOrb autoConnect />
+            </div>
+          </div>,
+
+          // Panel 2 — Routine + Goals
+          <div key="right" className="px-3 pt-3 pb-16 space-y-3">
+            <RoutineWidget />
+            <GoalsWidget />
+          </div>,
+        ]}
+      />
+
+      <MobileBottomNav />
     </div>
   );
 }
