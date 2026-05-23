@@ -253,6 +253,19 @@ function GoalsWidget() {
 // ─── Main dashboard ───────────────────────────────────────────────────────────
 
 export default function Dashboard() {
+  // Detect mobile after mount so only ONE VoiceOrb ever auto-connects.
+  // CSS hides/shows layouts but both would render JS — this prevents double
+  // LiveKit connections which crash the browser tab.
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
   return (
     <div className="h-screen bg-[#050b14] text-white flex flex-col overflow-hidden">
 
@@ -267,7 +280,7 @@ export default function Dashboard() {
             <TasksWidget />
           </aside>
 
-          {/* Center — voice orb */}
+          {/* Center — voice orb (only mounts when confirmed desktop) */}
           <main className="flex-1 flex items-center justify-center bg-[#050b14] relative overflow-hidden">
             <div
               className="absolute inset-0 opacity-[0.03]"
@@ -277,7 +290,7 @@ export default function Dashboard() {
               }}
             />
             <div className="relative z-10">
-              <VoiceOrb autoConnect />
+              {isMobile === false && <VoiceOrb autoConnect />}
             </div>
           </main>
 
@@ -312,9 +325,8 @@ export default function Dashboard() {
               <TasksWidget />
             </div>,
 
-            // Panel 1 — Voice orb (hero)
-            <div key="center" className="flex flex-col items-center justify-center h-full pb-12">
-              {/* Grid background */}
+            // Panel 1 — Voice orb (only mounts when confirmed mobile)
+            <div key="center" className="relative flex flex-col items-center justify-center h-full pb-12">
               <div
                 className="absolute inset-0 opacity-[0.03] pointer-events-none"
                 style={{
@@ -323,7 +335,7 @@ export default function Dashboard() {
                 }}
               />
               <div className="relative z-10" style={{ transform: "scale(0.78)", transformOrigin: "center center" }}>
-                <VoiceOrb autoConnect />
+                {isMobile === true && <VoiceOrb autoConnect />}
               </div>
             </div>,
 
