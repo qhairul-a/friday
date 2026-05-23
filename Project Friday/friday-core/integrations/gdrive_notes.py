@@ -138,6 +138,94 @@ def write_note(title: str, content: str) -> str:
     return filename
 
 
+def list_notes(limit: int = 10) -> str:
+    """List recent notes in the Friday folder."""
+    service = _get_service()
+    folder_id = _get_friday_folder_id(service)
+
+    result = service.files().list(
+        q=f"'{folder_id}' in parents and trashed=false",
+        fields="files(id, name, modifiedTime)",
+        orderBy="modifiedTime desc",
+        pageSize=limit,
+    ).execute()
+
+    files = result.get("files", [])
+    if not files:
+        return "No notes found."
+
+    lines = [f"Recent notes ({len(files)}):"]
+    for f in files:
+        display_title = re.sub(r"^\d{4}-\d{2}-\d{2} \d{4} ", "", f["name"].removesuffix(".md"))
+        mod_date = f["modifiedTime"][:10]
+        lines.append(f"— {display_title} (saved {mod_date})")
+    return "\n".join(lines)
+
+
+def _find_note(service, folder_id: str, title_query: str) -> list:
+    """Find notes by partial title match."""
+    result = service.files().list(
+        q=f"'{folder_id}' in parents and trashed=false",
+        fields="files(id, name)",
+        pageSize=50,
+    ).execute()
+    files = result.get("files", [])
+    return [f for f in files if title_query.lower() in f["name"].lower()]
+
+
+def edit_note(title_query: str, new_content: str) -> str:
+    """Update the content of an existing note by partial title match."""
+    from googleapiclient.http import MediaIoBaseUpload
+
+    service = _get_service()
+    folder_id = _get_friday_folder_id(service)
+    matches = _find_note(service, folder_id, title_query)
+
+    if not matches:
+        return f"No note found matching '{title_query}'."
+    if len(matches) > 1:
+        names = ", ".join(
+            re.sub(r"^\d{4}-\d{2}-\d{2} \d{4} ", "", f["name"].removesuffix(".md"))
+            for f in matches[:3]
+        )
+        return f"Multiple notes match '{title_query}': {names}. Please be more specific."
+
+    f = matches[0]
+    display_title = re.sub(r"^\d{4}-\d{2}-\d{2} \d{4} ", "", f["name"].removesuffix(".md"))
+    tz = ZoneInfo(os.environ.get("TIMEZONE", "Asia/Singapore"))
+    display_ts = datetime.now(tz).strftime("%Y-%m-%d %H:%M")
+    body = f"# {display_title}\n\n{new_content}\n\n---\n*Last edited by Friday · {display_ts}*\n"
+
+    media = MediaIoBaseUpload(
+        io.BytesIO(body.encode("utf-8")),
+        mimetype="text/plain",
+        resumable=False,
+    )
+    service.files().update(fileId=f["id"], media_body=media).execute()
+    return f"Updated note: {display_title}"
+
+
+def delete_note(title_query: str) -> str:
+    """Delete a note by partial title match."""
+    service = _get_service()
+    folder_id = _get_friday_folder_id(service)
+    matches = _find_note(service, folder_id, title_query)
+
+    if not matches:
+        return f"No note found matching '{title_query}'."
+    if len(matches) > 1:
+        names = ", ".join(
+            re.sub(r"^\d{4}-\d{2}-\d{2} \d{4} ", "", f["name"].removesuffix(".md"))
+            for f in matches[:3]
+        )
+        return f"Multiple notes match '{title_query}': {names}. Please be more specific."
+
+    f = matches[0]
+    display_title = re.sub(r"^\d{4}-\d{2}-\d{2} \d{4} ", "", f["name"].removesuffix(".md"))
+    service.files().delete(fileId=f["id"]).execute()
+    return f"Deleted note: {display_title}"
+
+
 def search_notes(query: str, max_results: int = 5) -> str:
     """Search notes in the Friday folder using Google Drive full-text search."""
     from googleapiclient.http import MediaIoBaseDownload

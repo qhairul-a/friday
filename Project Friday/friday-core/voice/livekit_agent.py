@@ -21,7 +21,7 @@ from google.cloud import texttospeech
 from profile.storage import load_profile
 from profile.schema import FridayProfile
 from integrations import gdrive_notes
-from integrations.expenses import append_expense, get_finance_context
+from integrations.expenses import append_expense, get_finance_context, list_expenses, edit_expense, delete_expense
 from integrations.calendar import get_upcoming_events, create_event, find_events, delete_event
 from integrations.routines import get_routines, mark_routine_done, add_routine_item, delete_routine_item, update_routine_schedule
 from integrations.briefings import get_pending_briefing, mark_delivered, build_briefing_content
@@ -90,6 +90,21 @@ class FridayVoiceAgent(Agent):
         return f"Note saved: {title}"
 
     @function_tool
+    async def list_notes(self) -> str:
+        """List recent notes. Call this before editing or deleting a note."""
+        return await asyncio.to_thread(gdrive_notes.list_notes)
+
+    @function_tool
+    async def edit_note(self, title: str, new_content: str) -> str:
+        """Update the content of an existing note by partial title match."""
+        return await asyncio.to_thread(gdrive_notes.edit_note, title, new_content)
+
+    @function_tool
+    async def delete_note(self, title: str) -> str:
+        """Delete a note by partial title match. Always confirm with user before calling."""
+        return await asyncio.to_thread(gdrive_notes.delete_note, title)
+
+    @function_tool
     async def get_spending_summary(self, month: str = "") -> str:
         """Get spending breakdown. month is YYYY-MM, empty for current month."""
         return await asyncio.to_thread(
@@ -105,6 +120,37 @@ class FridayVoiceAgent(Agent):
             append_expense,
             os.environ.get("FRIDAY_USER_ID", "default"),
             amount, category, description, expense_date or None,
+        )
+
+    @function_tool
+    async def list_recent_expenses(self, month: str = "") -> str:
+        """List individual expense entries with IDs. Call this before editing or deleting. month is YYYY-MM, empty for current month."""
+        return await asyncio.to_thread(
+            list_expenses,
+            os.environ.get("FRIDAY_USER_ID", "default"),
+            month or None,
+        )
+
+    @function_tool
+    async def edit_expense(self, expense_id: str, amount: float = 0, category: str = "", description: str = "", expense_date: str = "") -> str:
+        """Edit an expense by its short ID (from list_recent_expenses). Pass only fields to change; leave others empty."""
+        return await asyncio.to_thread(
+            edit_expense,
+            os.environ.get("FRIDAY_USER_ID", "default"),
+            expense_id,
+            amount if amount else None,
+            category or None,
+            description or None,
+            expense_date or None,
+        )
+
+    @function_tool
+    async def delete_expense(self, expense_id: str) -> str:
+        """Delete an expense by its short ID (from list_recent_expenses). Always confirm with user before calling."""
+        return await asyncio.to_thread(
+            delete_expense,
+            os.environ.get("FRIDAY_USER_ID", "default"),
+            expense_id,
         )
 
     @function_tool
