@@ -27,6 +27,7 @@ from integrations.routines import get_routines, mark_routine_done, add_routine_i
 from integrations.briefings import get_pending_briefing, mark_delivered, build_briefing_content
 from integrations.tasks import list_tasks, create_task, move_task, update_task
 from integrations.goals import get_goals, add_goal, update_goal, delete_goal
+from integrations.reminders import get_reminders, add_reminder, edit_reminder, mark_reminder_done, delete_reminder
 
 
 def _build_voice_instructions(profile: FridayProfile) -> str:
@@ -264,6 +265,31 @@ class FridayVoiceAgent(Agent):
     async def delete_goal(self, title: str) -> str:
         """Delete a goal by partial title match."""
         return await asyncio.to_thread(delete_goal, os.environ.get("FRIDAY_USER_ID", "default"), title)
+
+    @function_tool
+    async def get_reminders(self, include_done: bool = False) -> str:
+        """Get reminders. Set include_done=true to show completed ones too."""
+        return await asyncio.to_thread(get_reminders, os.environ.get("FRIDAY_USER_ID", "default"), include_done)
+
+    @function_tool
+    async def add_reminder(self, title: str, remind_at: str, note: str = "") -> str:
+        """Set a reminder. remind_at is ISO 8601 e.g. '2026-05-25T09:00'. note is optional extra detail."""
+        return await asyncio.to_thread(add_reminder, os.environ.get("FRIDAY_USER_ID", "default"), title, remind_at, note)
+
+    @function_tool
+    async def edit_reminder(self, reminder_id: str, title: str = "", remind_at: str = "", note: str = "") -> str:
+        """Edit a reminder by its short ID (from get_reminders). Leave fields empty to keep unchanged."""
+        return await asyncio.to_thread(edit_reminder, os.environ.get("FRIDAY_USER_ID", "default"), reminder_id, title, remind_at, note)
+
+    @function_tool
+    async def mark_reminder_done(self, reminder_id: str, done: bool = True) -> str:
+        """Mark a reminder as done or undone by its short ID."""
+        return await asyncio.to_thread(mark_reminder_done, os.environ.get("FRIDAY_USER_ID", "default"), reminder_id, done)
+
+    @function_tool
+    async def delete_reminder(self, reminder_id: str) -> str:
+        """Delete a reminder by its short ID. Always confirm with user before calling."""
+        return await asyncio.to_thread(delete_reminder, os.environ.get("FRIDAY_USER_ID", "default"), reminder_id)
 
 
 async def entrypoint(ctx: agents.JobContext):
