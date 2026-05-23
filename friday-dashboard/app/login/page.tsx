@@ -63,7 +63,7 @@ export default function LoginPage() {
             F.R.I.D.A.Y
           </h1>
           <p className="text-[#4a7a9b] text-sm mt-2 tracking-wide">
-            Personal AI Assistant
+            Fully Responsive Intelligent Digital Assistant for You
           </p>
           <div className="flex items-center justify-center gap-1.5 mt-3">
             <span className="w-1.5 h-1.5 rounded-full bg-[#00d4ff] animate-pulse" />
@@ -135,6 +135,11 @@ export default function LoginPage() {
           Session ends when this window is closed
         </p>
       </div>
+
+      {/* Bottom credit */}
+      <p className="absolute bottom-5 left-0 right-0 text-center text-[10px] text-[#2a4a6b] tracking-widest uppercase">
+        Powered by Qentico
+      </p>
     </div>
   );
 }
