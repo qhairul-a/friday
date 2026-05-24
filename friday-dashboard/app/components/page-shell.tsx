@@ -10,30 +10,30 @@ import VoiceOrbMini from "./voice-orb-mini";
 // ── Nav definitions ─────────────────────────────────────────────────────────
 
 const MAIN_NAV = [
-  { href: "/", label: "Overview", icon: "⬡" },
-  {
-    href: "/tasks",
-    label: "Tasks",
-    icon: "✓",
-    sub: [
-      { href: "/tasks",         label: "Overview" },
-      { href: "/tasks/archive", label: "Archive"  },
-    ],
-  },
-  { href: "/routine", label: "Routine", icon: "☑" },
-  { href: "/goals",   label: "Goals",   icon: "◎" },
-  { href: "/notes",   label: "Notes",   icon: "◱" },
+  { href: "/", label: "Main Frame", icon: "⬡" },
   {
     href: "/finance",
     label: "Finance",
     icon: "◈",
     sub: [
-      { href: "/finance",                   label: "Overview"          },
+      { href: "/finance",                   label: "Snapshot"          },
+      { href: "/finance/savings",           label: "Savings"           },
       { href: "/finance/liabilities",       label: "Fixed Expenses"    },
       { href: "/finance/variable-expenses", label: "Variable Expenses" },
-      { href: "/finance/savings",           label: "Savings"           },
     ],
   },
+  {
+    href: "/tasks",
+    label: "Tasks",
+    icon: "✓",
+    sub: [
+      { href: "/tasks",         label: "Kanban Board" },
+      { href: "/tasks/archive", label: "Archive"      },
+    ],
+  },
+  { href: "/routine", label: "Routine", icon: "☑" },
+  { href: "/goals",   label: "Goals",   icon: "◎" },
+  { href: "/notes",   label: "Notes",   icon: "◱" },
 ];
 
 // ── Nav item — accordion submenu expands below on hover (useState-driven) ────
@@ -128,8 +128,8 @@ export default function PageShell({
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left sidebar — desktop only */}
-        {/* Left sidebar — overflow-visible so flyout submenus bleed into main area */}
-        <aside className="hidden md:flex w-64 border-r border-[#1a3a5c] bg-[#06101e] shrink-0 flex-col items-center py-6 px-3 gap-6">
+        {/* Left sidebar — overflow-y-auto lets accordion expand with scroll */}
+        <aside className="hidden md:flex w-64 border-r border-[#1a3a5c] bg-[#06101e] shrink-0 flex-col items-center py-6 px-3 gap-6 overflow-y-auto">
 
           {/* Voice orb */}
           <VoiceOrbMini />
