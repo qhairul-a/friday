@@ -6,7 +6,7 @@ import DashboardHeader from "./dashboard-header";
 import MobileBottomNav from "./mobile-bottom-nav";
 import VoiceOrbMini from "./voice-orb-mini";
 
-// ── Nav definitions ────────────────────────────────────────────────────────────
+// ── Nav definitions ─────────────────────────────────────────────────────────
 
 const MAIN_NAV = [
   {
@@ -33,16 +33,6 @@ const MAIN_NAV = [
     ],
   },
 ];
-
-const BOTTOM_NAV = [
-  { href: "/profile",    label: "Profile",  icon: "◉" },
-  { href: "/onboarding", label: "Settings", icon: "⚙" },
-];
-
-async function handleLogout() {
-  await fetch("/api/auth/logout", { method: "POST" });
-  window.location.href = "/login";
-}
 
 // ── Nav item with optional flyout submenu ──────────────────────────────────────
 
@@ -122,7 +112,8 @@ export default function PageShell({
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left sidebar — desktop only */}
-        <aside className="hidden md:flex w-64 border-r border-[#1a3a5c] bg-[#06101e] shrink-0 flex-col items-center py-6 px-3 gap-6 overflow-y-auto">
+        {/* Left sidebar — overflow-visible so flyout submenus bleed into main area */}
+        <aside className="hidden md:flex w-64 border-r border-[#1a3a5c] bg-[#06101e] shrink-0 flex-col items-center py-6 px-3 gap-6">
 
           {/* Voice orb */}
           <VoiceOrbMini />
@@ -139,35 +130,6 @@ export default function PageShell({
               <NavItem key={item.href} item={item} pathname={pathname} />
             ))}
           </nav>
-
-          {/* Push bottom nav down */}
-          <div className="flex-1" />
-
-          {/* Bottom nav — Profile, Settings, Sign out */}
-          <div className="w-full flex flex-col gap-0.5">
-            <div className="w-full h-px bg-[#1a3a5c] mb-3" />
-            {BOTTOM_NAV.map(({ href, label, icon }) => (
-              <Link
-                key={href}
-                href={href}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs transition-colors nav-glow ${
-                  pathname === href
-                    ? "bg-[#0d2240] border border-[#1a3a5c] nav-glow-active"
-                    : "text-[#4a7a9b]"
-                }`}
-              >
-                <span className="text-sm shrink-0">{icon}</span>
-                {label}
-              </Link>
-            ))}
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-[#4a7a9b] hover:text-red-400 transition-colors w-full"
-            >
-              <span className="text-sm shrink-0">↪</span>
-              Sign out
-            </button>
-          </div>
         </aside>
 
         {/* Page content */}

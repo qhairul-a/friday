@@ -2,6 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+async function handleLogout() {
+  await fetch("/api/auth/logout", { method: "POST" });
+  window.location.href = "/login";
+}
 
 const WEATHER_ICON: Record<number, string> = {
   0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️",
@@ -26,6 +32,7 @@ interface WeatherData { temp: number; feelsLike: number; code: number; }
 export default function DashboardHeader() {
   const [now, setNow] = useState(new Date());
   const [weather, setWeather] = useState<WeatherData | null>(null);
+  const pathname = usePathname();
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -75,8 +82,28 @@ export default function DashboardHeader() {
         </div>
       </div>
 
-      {/* Right — spacer to keep clock centered */}
-      <div className="w-64 shrink-0" />
+      {/* Right — Profile, Settings, Sign out (flushed right) */}
+      <div className="w-64 shrink-0 flex justify-end items-center gap-5">
+        <Link
+          href="/profile"
+          className={`text-[11px] uppercase tracking-wider transition-colors nav-glow ${pathname === "/profile" ? "text-[#00d4ff] font-semibold" : "text-[#4a7a9b]"}`}
+        >
+          Profile
+        </Link>
+        <Link
+          href="/onboarding"
+          title="Settings"
+          className={`text-[11px] uppercase tracking-wider transition-colors nav-glow ${pathname === "/onboarding" ? "text-[#00d4ff] font-semibold" : "text-[#4a7a9b]"}`}
+        >
+          ⚙
+        </Link>
+        <button
+          onClick={handleLogout}
+          className="text-[11px] uppercase tracking-wider text-[#4a7a9b] hover:text-red-400 transition-colors"
+        >
+          Sign out
+        </button>
+      </div>
     </header>
   );
 }
