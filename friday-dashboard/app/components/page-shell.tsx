@@ -14,8 +14,8 @@ const MAIN_NAV = [
     label: "Tasks",
     icon: "✓",
     sub: [
-      { href: "/tasks",         label: "Kanban"  },
-      { href: "/tasks/archive", label: "Archive" },
+      { href: "/tasks",         label: "Overview" },
+      { href: "/tasks/archive", label: "Archive"  },
     ],
   },
   { href: "/routine", label: "Routine", icon: "☑" },
@@ -34,7 +34,7 @@ const MAIN_NAV = [
   },
 ];
 
-// ── Nav item with optional flyout submenu ──────────────────────────────────────
+// ── Nav item — accordion submenu expands below on hover ──────────────────────
 
 function NavItem({
   item,
@@ -43,13 +43,13 @@ function NavItem({
   item: (typeof MAIN_NAV)[number];
   pathname: string;
 }) {
-  // A parent link is active if we're on it or any of its sub-routes
   const isActive =
     pathname === item.href || pathname.startsWith(item.href + "/");
   const hasSub = item.sub && item.sub.length > 0;
 
   return (
-    <div className="relative group w-full">
+    <div className="group w-full">
+      {/* Parent link */}
       <Link
         href={item.href}
         className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs transition-colors w-full nav-glow ${
@@ -61,24 +61,27 @@ function NavItem({
         <span className="text-sm shrink-0">{item.icon}</span>
         <span className="flex-1">{item.label}</span>
         {hasSub && (
-          <span className="text-[10px] text-[#364c61] group-hover:text-[#00d4ff] transition-colors">›</span>
+          <span className="text-[10px] text-[#364c61] group-hover:text-[#00d4ff] transition-all duration-200 group-hover:rotate-90 inline-block">
+            ›
+          </span>
         )}
       </Link>
 
-      {/* Flyout submenu — appears to the right on hover */}
+      {/* Accordion submenu — expands below, pushes siblings down */}
       {hasSub && (
-        <div className="absolute left-full top-0 ml-2 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-150 z-50 min-w-[160px]">
-          <div className="bg-[#07101f] border border-[#1a3a5c] rounded-xl py-1.5 shadow-xl shadow-black/50">
+        <div className="max-h-0 overflow-hidden group-hover:max-h-48 transition-all duration-200 ease-in-out">
+          <div className="flex flex-col gap-0.5 pl-4 pt-1 pb-1">
             {item.sub!.map((s) => (
               <Link
-                key={s.href}
+                key={s.label}
                 href={s.href}
-                className={`flex items-center px-4 py-2 text-xs transition-colors nav-glow ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] transition-colors nav-glow ${
                   pathname === s.href
-                    ? "text-[#00d4ff] nav-glow-active bg-[#0d2240]"
+                    ? "text-[#00d4ff] nav-glow-active"
                     : "text-[#4a7a9b]"
                 }`}
               >
+                <span className="w-1 h-1 rounded-full bg-current shrink-0 opacity-60" />
                 {s.label}
               </Link>
             ))}

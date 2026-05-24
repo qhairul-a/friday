@@ -35,6 +35,63 @@ function Widget({ title, icon, children, action }: {
 
 interface CalendarEvent { title: string; start: string; startStr: string; }
 
+const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+function MonthCalendar({ events }: { events: CalendarEvent[] }) {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const todayDate = today.getDate();
+
+  const firstDow = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // Days in this month that have events
+  const eventDays = new Set(
+    events
+      .filter((ev) => {
+        const d = new Date(ev.start);
+        return d.getFullYear() === year && d.getMonth() === month;
+      })
+      .map((ev) => new Date(ev.start).getDate())
+  );
+
+  // Build grid cells: nulls for padding, then day numbers
+  const cells: (number | null)[] = [
+    ...Array<null>(firstDow).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+
+  const monthLabel = today.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  return (
+    <div className="shrink-0" style={{ width: 200 }}>
+      <div className="text-[11px] font-semibold text-white mb-2 text-center">{monthLabel}</div>
+      <div className="grid grid-cols-7 gap-y-0.5">
+        {WEEKDAY_LABELS.map((d) => (
+          <div key={d} className="text-[9px] text-[#364c61] font-medium text-center py-0.5">{d}</div>
+        ))}
+        {cells.map((day, i) => (
+          <div
+            key={i}
+            className={`text-[10px] h-6 flex items-center justify-center rounded-full transition-colors ${
+              day === null
+                ? ""
+                : day === todayDate
+                ? "bg-[#00d4ff] text-[#050b14] font-bold"
+                : eventDays.has(day)
+                ? "text-[#00d4ff] font-semibold"
+                : "text-[#4a7a9b]"
+            }`}
+          >
+            {day ?? ""}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CalendarWidget() {
   const [events, setEvents] = useState<CalendarEvent[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -57,23 +114,34 @@ function CalendarWidget() {
         <Link href="/onboarding" className="text-[10px] text-[#4a7a9b] hover:text-[#00d4ff] transition-colors">⚙</Link>
       </div>
     }>
-      {events === null ? (
-        <div className="text-[#4a7a9b] text-xs">Loading…</div>
-      ) : events.length === 0 ? (
-        <div className="text-[#4a7a9b] text-[11px] text-center py-1">No upcoming events</div>
-      ) : (
-        <div className="flex flex-col gap-1.5">
-          {events.map((ev, i) => (
-            <div key={i} className="flex items-start gap-2 bg-[#060e1c] rounded-lg px-2.5 py-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#00d4ff] shrink-0 mt-1" />
-              <div className="flex-1 min-w-0">
-                <div className="text-[11px] text-white truncate">{ev.title}</div>
-                <div className="text-[10px] text-[#4a7a9b] mt-0.5">{ev.startStr}</div>
-              </div>
+      <div className="flex gap-5">
+        {/* Left — month calendar */}
+        <MonthCalendar events={events ?? []} />
+
+        {/* Divider */}
+        <div className="w-px bg-[#1a3a5c] shrink-0" />
+
+        {/* Right — upcoming events */}
+        <div className="flex-1 min-w-0">
+          {events === null ? (
+            <div className="text-[#4a7a9b] text-xs">Loading…</div>
+          ) : events.length === 0 ? (
+            <div className="text-[#4a7a9b] text-[11px] text-center py-1">No upcoming events</div>
+          ) : (
+            <div className="flex flex-col gap-1.5 overflow-y-auto" style={{ maxHeight: 180 }}>
+              {events.map((ev, i) => (
+                <div key={i} className="flex items-start gap-2 bg-[#060e1c] rounded-lg px-2.5 py-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#00d4ff] shrink-0 mt-1" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[11px] text-white truncate">{ev.title}</div>
+                    <div className="text-[10px] text-[#4a7a9b] mt-0.5">{ev.startStr}</div>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      )}
+      </div>
     </Widget>
   );
 }
@@ -286,12 +354,20 @@ export default function Dashboard() {
     return (
       <PageShell>
         <div className="p-6 h-full overflow-auto">
-          <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={GRID_BG} />
-          <div className="relative grid grid-cols-2 gap-4">
-            <CalendarWidget />
-            <TasksWidget />
+          <div className="grid grid-cols-2 gap-4">
+            {/* Row 1 — Calendar (full width) */}
+            <div className="col-span-2">
+              <CalendarWidget />
+            </div>
+
+            {/* Row 2 — Routine (left) + Tasks (right) */}
             <RoutineWidget />
-            <GoalsWidget />
+            <TasksWidget />
+
+            {/* Row 3 — Goals (full width) */}
+            <div className="col-span-2">
+              <GoalsWidget />
+            </div>
           </div>
         </div>
       </PageShell>
