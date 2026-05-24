@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import DashboardHeader from "./dashboard-header";
 import MobileBottomNav from "./mobile-bottom-nav";
@@ -9,6 +10,7 @@ import VoiceOrbMini from "./voice-orb-mini";
 // ── Nav definitions ─────────────────────────────────────────────────────────
 
 const MAIN_NAV = [
+  { href: "/", label: "Overview", icon: "⬡" },
   {
     href: "/tasks",
     label: "Tasks",
@@ -34,7 +36,7 @@ const MAIN_NAV = [
   },
 ];
 
-// ── Nav item — accordion submenu expands below on hover ──────────────────────
+// ── Nav item — accordion submenu expands below on hover (useState-driven) ────
 
 function NavItem({
   item,
@@ -43,12 +45,17 @@ function NavItem({
   item: (typeof MAIN_NAV)[number];
   pathname: string;
 }) {
+  const [open, setOpen] = useState(false);
   const isActive =
     pathname === item.href || pathname.startsWith(item.href + "/");
   const hasSub = item.sub && item.sub.length > 0;
 
   return (
-    <div className="group w-full">
+    <div
+      className="w-full"
+      onMouseEnter={() => hasSub && setOpen(true)}
+      onMouseLeave={() => hasSub && setOpen(false)}
+    >
       {/* Parent link */}
       <Link
         href={item.href}
@@ -61,15 +68,21 @@ function NavItem({
         <span className="text-sm shrink-0">{item.icon}</span>
         <span className="flex-1">{item.label}</span>
         {hasSub && (
-          <span className="text-[10px] text-[#364c61] group-hover:text-[#00d4ff] transition-all duration-200 group-hover:rotate-90 inline-block">
+          <span
+            className="text-[10px] text-[#364c61] transition-all duration-200 inline-block"
+            style={{ transform: open ? "rotate(90deg)" : "none", color: open ? "#00d4ff" : undefined }}
+          >
             ›
           </span>
         )}
       </Link>
 
-      {/* Accordion submenu — expands below, pushes siblings down */}
+      {/* Accordion — expands below, pushing siblings down */}
       {hasSub && (
-        <div className="max-h-0 overflow-hidden group-hover:max-h-48 transition-all duration-200 ease-in-out">
+        <div
+          className="overflow-hidden transition-all duration-200 ease-in-out"
+          style={{ maxHeight: open ? "12rem" : "0" }}
+        >
           <div className="flex flex-col gap-0.5 pl-4 pt-1 pb-1">
             {item.sub!.map((s) => (
               <Link

@@ -39,34 +39,46 @@ const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 function MonthCalendar({ events }: { events: CalendarEvent[] }) {
   const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth();
-  const todayDate = today.getDate();
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
 
-  const firstDow = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  function prev() {
+    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
+    else setViewMonth(m => m - 1);
+  }
+  function next() {
+    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0); }
+    else setViewMonth(m => m + 1);
+  }
 
-  // Days in this month that have events
+  const isCurrentMonth = viewYear === today.getFullYear() && viewMonth === today.getMonth();
+  const firstDow = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
   const eventDays = new Set(
     events
       .filter((ev) => {
         const d = new Date(ev.start);
-        return d.getFullYear() === year && d.getMonth() === month;
+        return d.getFullYear() === viewYear && d.getMonth() === viewMonth;
       })
       .map((ev) => new Date(ev.start).getDate())
   );
 
-  // Build grid cells: nulls for padding, then day numbers
   const cells: (number | null)[] = [
     ...Array<null>(firstDow).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
 
-  const monthLabel = today.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   return (
     <div className="shrink-0" style={{ width: 200 }}>
-      <div className="text-[11px] font-semibold text-white mb-2 text-center">{monthLabel}</div>
+      {/* Month header with prev/next */}
+      <div className="flex items-center justify-between mb-2">
+        <button onClick={prev} className="text-[#4a7a9b] hover:text-[#00d4ff] transition-colors text-sm px-1">‹</button>
+        <div className="text-[11px] font-semibold text-white">{monthLabel}</div>
+        <button onClick={next} className="text-[#4a7a9b] hover:text-[#00d4ff] transition-colors text-sm px-1">›</button>
+      </div>
       <div className="grid grid-cols-7 gap-y-0.5">
         {WEEKDAY_LABELS.map((d) => (
           <div key={d} className="text-[9px] text-[#364c61] font-medium text-center py-0.5">{d}</div>
@@ -77,7 +89,7 @@ function MonthCalendar({ events }: { events: CalendarEvent[] }) {
             className={`text-[10px] h-6 flex items-center justify-center rounded-full transition-colors ${
               day === null
                 ? ""
-                : day === todayDate
+                : isCurrentMonth && day === today.getDate()
                 ? "bg-[#00d4ff] text-[#050b14] font-bold"
                 : eventDays.has(day)
                 ? "text-[#00d4ff] font-semibold"

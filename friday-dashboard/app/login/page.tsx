@@ -131,9 +131,7 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-[10px] text-[#2a4a6b] mt-6 tracking-wide">
-          Session ends when this window is closed
-        </p>
+
       </div>
 
       {/* Bottom credit */}
