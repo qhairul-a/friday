@@ -31,3 +31,16 @@ body {
     overflow-x: hidden;
   }
 }
+
+/* Sidebar nav link hover glow */
+.nav-glow {
+  transition: color 0.2s, text-shadow 0.2s;
+}
+.nav-glow:hover {
+  color: #00d4ff;
+  text-shadow: 0 0 8px rgba(0, 212, 255, 0.8), 0 0 20px rgba(0, 212, 255, 0.4);
+}
+.nav-glow-active {
+  color: #00d4ff;
+  text-shadow: 0 0 6px rgba(0, 212, 255, 0.6), 0 0 16px rgba(0, 212, 255, 0.3);
+}

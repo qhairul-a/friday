@@ -295,14 +295,17 @@ class FridayVoiceAgent(Agent):
 async def entrypoint(ctx: agents.JobContext):
     user_id = os.environ.get("FRIDAY_USER_ID", "default")
 
-    # Load profile and check briefings off the event loop so the room
-    # connection isn't blocked by Supabase / file I/O latency.
+    # Connect to the LiveKit room FIRST so the agent appears as a participant
+    # immediately. The browser starts a 30-second timeout when it joins the room;
+    # being present quickly (before the slow I/O below) keeps us well within that
+    # window and prevents spurious "didn't respond in time" errors.
+    await ctx.connect()
+
+    # Load profile and pending briefing concurrently while already connected.
     profile, pending = await asyncio.gather(
         asyncio.to_thread(load_profile, user_id),
         asyncio.to_thread(get_pending_briefing, user_id),
     )
-
-    await ctx.connect()
 
     _anthropic_client = anthropic_sdk.AsyncClient(
         api_key=os.environ["ANTHROPIC_API_KEY"],
@@ -336,6 +339,22 @@ async def entrypoint(ctx: agents.JobContext):
         greeting = "Greet the user briefly by name."
 
     await session.generate_reply(instructions=greeting)
+
+    # ── Keep the agent alive in the persistent room ──────────────────────────
+    #
+    # Previously the entrypoint returned here, which signalled "job complete"
+    # to the LiveKit framework — the agent disconnected and the room was torn
+    # down. The next time the user visited the dashboard a brand-new room was
+    # created and the agent had to cold-start (~15–25 s on this VM), reliably
+    # exceeding the browser's timeout.
+    #
+    # Now we block indefinitely. The agent stays connected so when the user
+    # navigates away and returns, they re-join the SAME room and the agent
+    # responds immediately (0-second reconnect instead of a 15–25 s cold start).
+    #
+    # The framework cancels this sleep (raises CancelledError) on graceful
+    # shutdown (systemd stop / SIGTERM), which cleans up correctly.
+    await asyncio.sleep(float("inf"))
 
 
 if __name__ == "__main__":

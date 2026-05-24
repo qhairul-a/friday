@@ -192,12 +192,16 @@ function ConnectedOrb({ onDisconnect, onTimeout }: { onDisconnect: () => void; o
   }, [lines]);
 
   useEffect(() => {
+    // 30 s gives the agent enough time to cold-start on the e2-micro VM
+    // (import all ML libraries + Supabase I/O + STT init ≈ 15–25 s).
+    // With the persistent-room fix, reconnects after navigation take ~0 s,
+    // so this timeout is only hit if the worker is genuinely offline.
     const t = setTimeout(() => {
       const s = stateRef.current;
       if (s !== "listening" && s !== "thinking" && s !== "speaking") {
         onTimeout();
       }
-    }, 12000);
+    }, 30000);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

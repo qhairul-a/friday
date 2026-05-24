@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase, USER_ID } from "@/lib/supabase";
 import { Task, RoutineItem, Goal } from "@/lib/types";
-import DashboardHeader from "./components/dashboard-header";
+import PageShell from "./components/page-shell";
 import VoiceOrb from "./components/voice-orb";
 import MobileSwipePanels from "./components/mobile-swipe-panels";
 import MobileBottomNav from "./components/mobile-bottom-nav";
@@ -281,30 +281,20 @@ export default function Dashboard() {
   }
 
   // ── DESKTOP LAYOUT (≥ 768px) ────────────────────────────────────────────────
+  // VoiceOrbMini lives in PageShell's sidebar — no orb rendered here.
   if (!isMobile) {
     return (
-      <div className="h-screen bg-[#050b14] text-white flex flex-col overflow-hidden">
-        <DashboardHeader />
-
-        <div className="flex-1 flex overflow-hidden">
-          <aside className="w-72 border-r border-[#1a3a5c] overflow-y-auto p-3 bg-[#06101e] shrink-0">
+      <PageShell>
+        <div className="p-6 h-full overflow-auto">
+          <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={GRID_BG} />
+          <div className="relative grid grid-cols-2 gap-4">
             <CalendarWidget />
             <TasksWidget />
-          </aside>
-
-          <main className="flex-1 flex items-center justify-center bg-[#050b14] relative overflow-hidden">
-            <div className="absolute inset-0 opacity-[0.03]" style={GRID_BG} />
-            <div className="relative z-10">
-              <VoiceOrb autoConnect />
-            </div>
-          </main>
-
-          <aside className="w-72 border-l border-[#1a3a5c] overflow-y-auto p-3 bg-[#06101e] shrink-0">
             <RoutineWidget />
             <GoalsWidget />
-          </aside>
+          </div>
         </div>
-      </div>
+      </PageShell>
     );
   }
 

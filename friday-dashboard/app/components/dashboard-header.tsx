@@ -23,22 +23,7 @@ const WEATHER_LABEL: Record<number, string> = {
 
 interface WeatherData { temp: number; feelsLike: number; code: number; }
 
-const NAV_LINKS = [
-  { href: "/tasks", label: "Tasks" },
-  { href: "/routine", label: "Routine" },
-  { href: "/goals", label: "Goals" },
-  { href: "/notes", label: "Notes" },
-  { href: "/finance", label: "Finance" },
-  { href: "/profile", label: "Profile" },
-  { href: "/onboarding", label: "⚙", title: "Settings" },
-];
-
-async function handleLogout() {
-  await fetch("/api/auth/logout", { method: "POST" });
-  window.location.href = "/login";
-}
-
-export default function DashboardHeader({ activeTab }: { activeTab?: string }) {
+export default function DashboardHeader() {
   const [now, setNow] = useState(new Date());
   const [weather, setWeather] = useState<WeatherData | null>(null);
 
@@ -59,7 +44,7 @@ export default function DashboardHeader({ activeTab }: { activeTab?: string }) {
 
   return (
     <header className="hidden md:flex h-16 border-b border-[#1a3a5c] items-center px-6 shrink-0 bg-[#07101f]">
-      {/* Left — branding */}
+      {/* Left — branding (w-64 matches sidebar width) */}
       <div className="flex items-center gap-3 w-64 shrink-0">
         <div className="flex flex-col leading-tight">
           <Link href="/" className="text-base font-bold tracking-[0.25em] text-[#00d4ff] hover:text-white transition-colors">
@@ -90,30 +75,8 @@ export default function DashboardHeader({ activeTab }: { activeTab?: string }) {
         </div>
       </div>
 
-      {/* Right — nav */}
-      <nav className="w-64 shrink-0 flex justify-end items-center gap-5">
-        {NAV_LINKS.map(({ href, label, title }) => (
-          <Link
-            key={href}
-            href={href}
-            title={title}
-            className={`text-[11px] uppercase tracking-wider transition-colors ${
-              activeTab === href
-                ? "text-[#00d4ff] font-semibold"
-                : "text-[#4a7a9b] hover:text-white"
-            }`}
-          >
-            {label}
-          </Link>
-        ))}
-        <button
-          onClick={handleLogout}
-          className="text-[11px] uppercase tracking-wider text-[#4a7a9b] hover:text-red-400 transition-colors"
-          title="Sign out"
-        >
-          Sign out
-        </button>
-      </nav>
+      {/* Right — spacer to keep clock centered */}
+      <div className="w-64 shrink-0" />
     </header>
   );
 }
