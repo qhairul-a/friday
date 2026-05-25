@@ -36,7 +36,7 @@ const MAIN_NAV = [
   { href: "/notes",   label: "Notes",   icon: "◱" },
 ];
 
-// ── Nav item — accordion submenu expands below on hover (useState-driven) ────
+// ── Nav item — accordion submenu expands on hover OR click ───────────────────
 
 function NavItem({
   item,
@@ -50,32 +50,39 @@ function NavItem({
     pathname === item.href || pathname.startsWith(item.href + "/");
   const hasSub = item.sub && item.sub.length > 0;
 
+  const rowClass = `flex items-center gap-3 px-3 py-2 rounded-lg text-xs transition-colors w-full nav-glow ${
+    isActive
+      ? "bg-[#0d2240] border border-[#1a3a5c] nav-glow-active"
+      : "text-[#4a7a9b]"
+  }`;
+
   return (
     <div
       className="w-full"
       onMouseEnter={() => hasSub && setOpen(true)}
       onMouseLeave={() => hasSub && setOpen(false)}
     >
-      {/* Parent link */}
-      <Link
-        href={item.href}
-        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs transition-colors w-full nav-glow ${
-          isActive
-            ? "bg-[#0d2240] border border-[#1a3a5c] nav-glow-active"
-            : "text-[#4a7a9b]"
-        }`}
-      >
-        <span className="text-sm shrink-0">{item.icon}</span>
-        <span className="flex-1">{item.label}</span>
-        {hasSub && (
+      {/* Parent row — button (toggle) for items with sub, Link for leaf items */}
+      {hasSub ? (
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className={rowClass}
+        >
+          <span className="text-sm shrink-0">{item.icon}</span>
+          <span className="flex-1 text-left">{item.label}</span>
           <span
             className="text-[10px] text-[#364c61] transition-all duration-200 inline-block"
             style={{ transform: open ? "rotate(90deg)" : "none", color: open ? "#00d4ff" : undefined }}
           >
             ›
           </span>
-        )}
-      </Link>
+        </button>
+      ) : (
+        <Link href={item.href} className={rowClass}>
+          <span className="text-sm shrink-0">{item.icon}</span>
+          <span className="flex-1">{item.label}</span>
+        </Link>
+      )}
 
       {/* Accordion — expands below, pushing siblings down */}
       {hasSub && (

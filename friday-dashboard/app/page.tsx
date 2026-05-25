@@ -8,6 +8,7 @@ import PageShell from "./components/page-shell";
 import VoiceOrb from "./components/voice-orb";
 import MobileSwipePanels from "./components/mobile-swipe-panels";
 import MobileBottomNav from "./components/mobile-bottom-nav";
+import HealthWidget from "./components/health-widget";
 
 const PRIORITY_WEIGHT = { high: 3, normal: 2, low: 1 } as const;
 const STATUS_WEIGHT = { in_progress: 2, todo: 1, done: 0, archived: 0 } as const;
@@ -37,7 +38,7 @@ interface CalendarEvent { title: string; start: string; startStr: string; }
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
-function MonthCalendar({ events }: { events: CalendarEvent[] }) {
+function MonthCalendar({ events, fullWidth = false }: { events: CalendarEvent[]; fullWidth?: boolean }) {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -72,7 +73,7 @@ function MonthCalendar({ events }: { events: CalendarEvent[] }) {
   const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   return (
-    <div className="shrink-0" style={{ width: 200 }}>
+    <div className={fullWidth ? "w-full" : "shrink-0"} style={fullWidth ? undefined : { width: 200 }}>
       {/* Month header with prev/next */}
       <div className="flex items-center justify-between mb-2">
         <button onClick={prev} className="text-[#4a7a9b] hover:text-[#00d4ff] transition-colors text-sm px-1">‹</button>
@@ -330,6 +331,68 @@ function GoalsWidget() {
   );
 }
 
+// ─── Mobile calendar panel (stacked: month view on top, events list below) ────
+
+function MobileCalendarPanel() {
+  const [events, setEvents] = useState<CalendarEvent[] | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  function load() {
+    setRefreshing(true);
+    fetch("/api/calendar")
+      .then((r) => r.json())
+      .then((data: CalendarEvent[]) => setEvents(data))
+      .catch(() => setEvents([]))
+      .finally(() => setRefreshing(false));
+  }
+
+  useEffect(() => { load(); }, []);
+
+  return (
+    <div className="px-3 pt-3 pb-24 overflow-y-auto">
+      <Widget
+        title="Calendar"
+        icon="◈"
+        action={
+          <button
+            onClick={load}
+            disabled={refreshing}
+            className="text-[10px] text-[#4a7a9b] hover:text-[#00d4ff] transition-colors disabled:opacity-40"
+            title="Refresh"
+          >
+            ↻
+          </button>
+        }
+      >
+        {/* Month grid — full width */}
+        <MonthCalendar events={events ?? []} fullWidth />
+
+        {/* Divider */}
+        <div className="w-full h-px bg-[#1a3a5c] my-3" />
+
+        {/* Upcoming events list */}
+        {events === null ? (
+          <div className="text-[#4a7a9b] text-xs">Loading…</div>
+        ) : events.length === 0 ? (
+          <div className="text-[#4a7a9b] text-[11px] text-center py-1">No upcoming events</div>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {events.map((ev, i) => (
+              <div key={i} className="flex items-start gap-2 bg-[#060e1c] rounded-lg px-2.5 py-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#00d4ff] shrink-0 mt-1" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[11px] text-white truncate">{ev.title}</div>
+                  <div className="text-[10px] text-[#4a7a9b] mt-0.5">{ev.startStr}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Widget>
+    </div>
+  );
+}
+
 // ─── Main dashboard ───────────────────────────────────────────────────────────
 
 const GRID_BG = {
@@ -376,10 +439,9 @@ export default function Dashboard() {
             <RoutineWidget />
             <TasksWidget />
 
-            {/* Row 3 — Goals (full width) */}
-            <div className="col-span-2">
-              <GoalsWidget />
-            </div>
+            {/* Row 3 — Goals (left) + Health (right) */}
+            <GoalsWidget />
+            <HealthWidget />
           </div>
         </div>
       </PageShell>
@@ -402,25 +464,23 @@ export default function Dashboard() {
       <MobileSwipePanels
         initialPanel={1}
         panels={[
-          // Panel 0 — Calendar + Tasks
-          <div key="left" className="px-3 pt-3 pb-16 space-y-3">
-            <CalendarWidget />
+          // Panel 0 — Routine + Tasks + Health (stacked)
+          <div key="left" className="px-3 pt-3 pb-24 space-y-3 overflow-y-auto">
+            <RoutineWidget />
             <TasksWidget />
+            <HealthWidget />
           </div>,
 
-          // Panel 1 — Voice orb (hero)
-          <div key="center" className="relative flex flex-col items-center justify-center h-full pb-12">
+          // Panel 1 — Voice orb (hero, center default)
+          <div key="center" className="relative flex flex-col items-center justify-center h-full pb-20">
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={GRID_BG} />
             <div className="relative z-10" style={{ transform: "scale(0.78)", transformOrigin: "center center" }}>
               <VoiceOrb autoConnect />
             </div>
           </div>,
 
-          // Panel 2 — Routine + Goals
-          <div key="right" className="px-3 pt-3 pb-16 space-y-3">
-            <RoutineWidget />
-            <GoalsWidget />
-          </div>,
+          // Panel 2 — Calendar: month view (top) + events list (bottom)
+          <MobileCalendarPanel key="right" />,
         ]}
       />
 

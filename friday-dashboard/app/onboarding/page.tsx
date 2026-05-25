@@ -5,7 +5,7 @@ import Link from "next/link";
 import { supabase, USER_ID } from "@/lib/supabase";
 import { FridayProfile, defaultProfile, Briefing } from "@/lib/types";
 
-const SECTIONS = ["identity", "daily_routine", "health", "work_and_projects", "goals", "finance", "preferences", "calendar", "briefings"] as const;
+const SECTIONS = ["identity", "daily_routine", "health", "work_and_projects", "goals", "finance", "preferences", "calendar", "garmin_health", "briefings"] as const;
 type Section = typeof SECTIONS[number];
 
 const SECTION_LABELS: Record<Section, string> = {
@@ -17,8 +17,27 @@ const SECTION_LABELS: Record<Section, string> = {
   finance: "Finance",
   preferences: "Preferences",
   calendar: "Calendar",
+  garmin_health: "Health Metrics",
   briefings: "Briefings",
 };
+
+const GARMIN_METRICS: { key: string; label: string }[] = [
+  { key: "steps",              label: "Steps" },
+  { key: "distance",           label: "Distance walked/run" },
+  { key: "calories_active",    label: "Active calories" },
+  { key: "active_minutes",     label: "Active minutes" },
+  { key: "floors_climbed",     label: "Floors climbed" },
+  { key: "heart_rate_resting", label: "Resting heart rate" },
+  { key: "heart_rate_avg",     label: "Average heart rate" },
+  { key: "hrv",                label: "Heart rate variability (HRV)" },
+  { key: "body_battery",       label: "Body Battery" },
+  { key: "stress_avg",         label: "Stress level" },
+  { key: "spo2",               label: "Blood oxygen (SpO2)" },
+  { key: "sleep_duration",     label: "Sleep duration" },
+  { key: "sleep_score",        label: "Sleep score" },
+  { key: "sleep_stages",       label: "Sleep stages (deep / light / REM)" },
+  { key: "vo2_max",            label: "VO2 max" },
+];
 
 export default function OnboardingPage() {
   const [profile, setProfile] = useState<FridayProfile>(defaultProfile);
@@ -232,6 +251,117 @@ export default function OnboardingPage() {
               <p className="text-xs text-gray-500">
                 Google Calendar → Settings → [your calendar] → <span className="text-gray-400">Secret address in iCal format</span>
               </p>
+            </>
+          )}
+
+          {activeSection === "garmin_health" && (
+            <>
+              {/* Credentials */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Garmin Connect email</label>
+                  <input
+                    type="email"
+                    value={profile.integrations?.garmin_email ?? ""}
+                    placeholder="your@email.com"
+                    onChange={(e) =>
+                      setProfile((prev) => ({
+                        ...prev,
+                        integrations: { ...(prev.integrations ?? {}), garmin_email: e.target.value },
+                      }))
+                    }
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Garmin Connect password</label>
+                  <input
+                    type="password"
+                    value={profile.integrations?.garmin_password ?? ""}
+                    placeholder={profile.integrations?.garmin_password ? "••••••••" : "Enter password"}
+                    onChange={(e) =>
+                      setProfile((prev) => ({
+                        ...prev,
+                        integrations: { ...(prev.integrations ?? {}), garmin_password: e.target.value },
+                      }))
+                    }
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <p className="text-xs text-gray-500">
+                  Same credentials you use to log in at connect.garmin.com. Stored in your private Supabase — never shared.
+                </p>
+              </div>
+
+              {/* Connection status + toggle */}
+              <div className="flex items-center justify-between p-4 bg-gray-800 rounded-xl">
+                <div>
+                  <p className="text-sm font-medium text-white">Garmin Connect</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {profile.integrations?.garmin_enabled
+                      ? "Connected — data syncs every 4 hours"
+                      : "Not connected"}
+                  </p>
+                </div>
+                <button
+                  onClick={() =>
+                    setProfile((prev) => ({
+                      ...prev,
+                      integrations: {
+                        ...(prev.integrations ?? {}),
+                        garmin_enabled: !(prev.integrations?.garmin_enabled ?? false),
+                      },
+                    }))
+                  }
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    profile.integrations?.garmin_enabled ? "bg-indigo-600" : "bg-gray-600"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                      profile.integrations?.garmin_enabled ? "translate-x-6" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Metric toggles */}
+              <div>
+                <p className="text-sm font-medium text-gray-300 mb-1">Metrics to surface</p>
+                <p className="text-xs text-gray-500 mb-3">
+                  All Garmin data is stored for trend analysis. These toggles control which metrics Friday mentions aloud and shows on your dashboard.
+                </p>
+                <div className="space-y-3">
+                  {GARMIN_METRICS.map(({ key, label }) => {
+                    const enabled = profile.integrations?.garmin_enabled ?? false;
+                    const checked = (profile.integrations?.garmin_metrics ?? []).includes(key);
+                    return (
+                      <label
+                        key={key}
+                        className={`flex items-center gap-3 cursor-pointer group ${!enabled ? "opacity-40 cursor-not-allowed" : ""}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={!enabled}
+                          onChange={() => {
+                            const current = profile.integrations?.garmin_metrics ?? [];
+                            const next = checked
+                              ? current.filter((m) => m !== key)
+                              : [...current, key];
+                            setProfile((prev) => ({
+                              ...prev,
+                              integrations: { ...(prev.integrations ?? {}), garmin_metrics: next },
+                            }));
+                          }}
+                          className="accent-indigo-500"
+                        />
+                        <span className="text-sm text-white group-hover:text-indigo-300 transition-colors">{label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
             </>
           )}
 

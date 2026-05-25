@@ -46,6 +46,12 @@ export interface FridayProfile {
     entertainment: string[];
     calendar_urls: string[];
   };
+  integrations: {
+    garmin_enabled: boolean;
+    garmin_metrics: string[];
+    garmin_email: string;
+    garmin_password: string;
+  };
 }
 
 export interface Task {
@@ -110,4 +116,5 @@ export const defaultProfile: FridayProfile = {
   finance: { google_sheet_id: "", monthly_income: null, currency: "SGD", budget_allocations: { liabilities: null, personal_expense: null }, savings_goals: [], liabilities_list: [] },
   notes: [],
   preferences: { communication_style: "casual", verbosity: "concise", hobbies: [], entertainment: [], calendar_urls: [] },
+  integrations: { garmin_enabled: false, garmin_metrics: ["steps", "distance", "heart_rate_avg", "stress_avg", "sleep_duration", "sleep_score", "body_battery"], garmin_email: "", garmin_password: "" },
 };

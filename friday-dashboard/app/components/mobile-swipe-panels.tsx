@@ -60,8 +60,8 @@ export default function MobileSwipePanels({ panels, initialPanel = 1 }: MobileSw
         ))}
       </div>
 
-      {/* Dot indicators */}
-      <div className="absolute bottom-10 left-0 right-0 flex justify-center gap-2 pointer-events-none">
+      {/* Dot indicators — sit above the fixed tab bar (tab bar ≈ 56px + safe area) */}
+      <div className="absolute bottom-20 left-0 right-0 flex justify-center gap-2 pointer-events-none">
         {panels.map((_, i) => (
           <div
             key={i}
@@ -73,11 +73,6 @@ export default function MobileSwipePanels({ panels, initialPanel = 1 }: MobileSw
             }}
           />
         ))}
-      </div>
-
-      {/* Pill handle — swipe-up hint */}
-      <div className="absolute bottom-2 left-0 right-0 flex justify-center pointer-events-none">
-        <div className="w-10 h-1 rounded-full bg-[#1a3a5c]" />
       </div>
     </div>
   );

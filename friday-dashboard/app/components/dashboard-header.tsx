@@ -51,16 +51,16 @@ export default function DashboardHeader() {
 
   return (
     <header className="hidden md:flex h-16 border-b border-[#1a3a5c] items-center px-6 shrink-0 bg-[#07101f]">
-      {/* Left — branding (w-64 matches sidebar width) */}
+      {/* Left — branding (w-64 matches sidebar width); entire block links to home */}
       <div className="flex items-center gap-3 w-64 shrink-0">
-        <div className="flex flex-col leading-tight">
-          <Link href="/" className="text-base font-bold tracking-[0.25em] text-[#00d4ff] hover:text-white transition-colors">
+        <Link href="/" className="flex flex-col leading-tight group">
+          <span className="text-base font-bold tracking-[0.25em] text-[#00d4ff] group-hover:text-white transition-colors">
             F.R.I.D.A.Y
-          </Link>
+          </span>
           <span className="text-[8px] text-[#2a4a6b] tracking-widest uppercase mt-0.5">
             Powered by Qentico
           </span>
-        </div>
+        </Link>
         <span className="flex items-center gap-1.5 text-[10px] font-semibold text-[#00ff88] border border-[#00ff88]/30 rounded-full px-2 py-0.5">
           <span className="w-1.5 h-1.5 rounded-full bg-[#00ff88] animate-pulse" />
           Online
