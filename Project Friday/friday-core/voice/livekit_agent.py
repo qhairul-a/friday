@@ -13,8 +13,8 @@ load_dotenv()
 import httpx
 import anthropic as anthropic_sdk
 
-from livekit import agents
-from livekit.agents import AgentSession, Agent, function_tool
+from livekit import agents, rtc
+from livekit.agents import AgentSession, Agent, function_tool, RoomInputOptions
 from livekit.plugins import deepgram, google, anthropic
 from google.cloud import texttospeech
 
@@ -28,6 +28,7 @@ from integrations.briefings import get_pending_briefing, mark_delivered, build_b
 from integrations.tasks import list_tasks, create_task, move_task, update_task
 from integrations.goals import get_goals, add_goal, update_goal, delete_goal
 from integrations.reminders import get_reminders, add_reminder, edit_reminder, mark_reminder_done, delete_reminder
+from integrations.garmin_health import get_health_today, get_health_trends
 
 
 def _build_voice_instructions(profile: FridayProfile) -> str:
@@ -49,11 +50,25 @@ Behaviour rules:
 - Be proactive: mention anything worth flagging after the main response.
 
 Finance rules:
-- ALL expense and spending data is stored internally — you always have full access to it via your tools.
-- For ANY question about spending, expenses, or financial analysis, call get_spending_summary. Never say you cannot access this data.
+- IMPORTANT: The profile's finance section below is budget metadata ONLY (income, allocations, liabilities). It does NOT contain actual spending transactions.
+- ALL actual expense and spending transaction data lives in the Supabase database, accessible ONLY via your tools.
+- For ANY question about spending, expenses, costs, or financial analysis — including "variable expenses", "personal expenses", "how much did I spend", "what are my expenses" — you MUST call get_spending_summary. Never say you cannot access this data.
+- "Variable expenses" means personal/discretionary spending (food, transport, entertainment, etc.) from the database — call get_spending_summary and read the category breakdown aloud.
+- "Fixed expenses" or "liabilities" are found in profile.finance.liabilities_list below — read those directly from the profile.
 - get_spending_summary accepts an optional month (YYYY-MM). Use it for historical queries, e.g. '2026-04' for April 2026.
 - To record a new expense, call log_expense.
-- Google Sheets is no longer used for expenses. Do not mention it.
+- If a tool call fails due to a technical error, say so clearly — do not say "I don't have access to that data".
+
+Calendar rules:
+- All calendar event times are already converted to Asia/Singapore time before you receive them. Read them exactly as given.
+- Never say events are in UTC or mention timezone conversion — the times are already correct for the user.
+
+Health rules:
+- For any question about steps, distance, heart rate, body battery, stress, sleep, or fitness — call get_health_today.
+- For trends, weekly/monthly analysis, or health advice/recommendations — call get_health_trends. Analyse all the data returned and give 2–3 natural spoken recommendations with specific numbers.
+- Speak naturally. No bullet points. Reference actual numbers from the data.
+- Never give medical diagnoses. For persistent concerning patterns, suggest consulting a doctor.
+- Health data syncs every 4 hours. If data is missing, say it hasn't synced yet today.
 
 Here is everything you know about {name}:
 {profile_json}"""
@@ -291,6 +306,20 @@ class FridayVoiceAgent(Agent):
         """Delete a reminder by its short ID. Always confirm with user before calling."""
         return await asyncio.to_thread(delete_reminder, os.environ.get("FRIDAY_USER_ID", "default"), reminder_id)
 
+    @function_tool
+    async def get_health_today(self, date: str = "") -> str:
+        """Get today's health snapshot: steps, distance, heart rate, body battery, stress, sleep."""
+        return await asyncio.to_thread(
+            get_health_today, os.environ.get("FRIDAY_USER_ID", "default"), date or None
+        )
+
+    @function_tool
+    async def get_health_trends(self, days: int = 7) -> str:
+        """Analyse health trends and give recommendations. days=7 for a week, days=30 for a month."""
+        return await asyncio.to_thread(
+            get_health_trends, os.environ.get("FRIDAY_USER_ID", "default"), days
+        )
+
 
 async def entrypoint(ctx: agents.JobContext):
     user_id = os.environ.get("FRIDAY_USER_ID", "default")
@@ -300,6 +329,17 @@ async def entrypoint(ctx: agents.JobContext):
     # being present quickly (before the slow I/O below) keeps us well within that
     # window and prevents spurious "didn't respond in time" errors.
     await ctx.connect()
+
+    # ── Duplicate-agent guard ─────────────────────────────────────────────────
+    # LiveKit dispatches a new job every time a user joins the room, even when
+    # the persistent agent from a previous session is still present.  Without
+    # this check that causes two Friday instances to run side-by-side, producing
+    # the "double voice" symptom.  If another agent participant is already in
+    # the room we exit immediately and let the existing agent handle the session.
+    for participant in ctx.room.remote_participants.values():
+        if participant.kind == rtc.ParticipantKind.PARTICIPANT_KIND_AGENT:
+            print("[friday] Duplicate agent detected — exiting to prevent double-voice.")
+            return
 
     # Load profile and pending briefing concurrently while already connected.
     profile, pending = await asyncio.gather(
@@ -317,7 +357,7 @@ async def entrypoint(ctx: agents.JobContext):
     session = AgentSession(
         stt=deepgram.STT(api_key=os.environ["DEEPGRAM_API_KEY"]),
         llm=anthropic.LLM(
-            model="claude-haiku-4-5-20251001",
+            model="claude-sonnet-4-6",
             client=_anthropic_client,
             _strict_tool_schema=False,
         ),
@@ -328,7 +368,14 @@ async def entrypoint(ctx: agents.JobContext):
     )
 
     agent = FridayVoiceAgent(profile, pending_briefing=pending)
-    await session.start(agent, room=ctx.room)
+    await session.start(
+        agent,
+        room=ctx.room,
+        # Keep the session alive when the user navigates away or closes the tab.
+        # Without this, every disconnect triggers a new job dispatch on reconnect,
+        # spawning a second competing process which exhausts the worker capacity.
+        room_input_options=RoomInputOptions(close_on_disconnect=False),
+    )
 
     if pending:
         greeting = (
@@ -340,22 +387,42 @@ async def entrypoint(ctx: agents.JobContext):
 
     await session.generate_reply(instructions=greeting)
 
-    # ── Keep the agent alive in the persistent room ──────────────────────────
+    # ── Wait for room disconnect before exiting ──────────────────────────────
     #
-    # Previously the entrypoint returned here, which signalled "job complete"
-    # to the LiveKit framework — the agent disconnected and the room was torn
-    # down. The next time the user visited the dashboard a brand-new room was
-    # created and the agent had to cold-start (~15–25 s on this VM), reliably
-    # exceeding the browser's timeout.
+    # We wait until LiveKit closes the room (all participants leave) and then
+    # exit cleanly. This lets the framework recycle the process correctly.
     #
-    # Now we block indefinitely. The agent stays connected so when the user
-    # navigates away and returns, they re-join the SAME room and the agent
-    # responds immediately (0-second reconnect instead of a 15–25 s cold start).
-    #
-    # The framework cancels this sleep (raises CancelledError) on graceful
-    # shutdown (systemd stop / SIGTERM), which cleans up correctly.
-    await asyncio.sleep(float("inf"))
+    # Previous design used asyncio.sleep(float("inf")) which caused processes to
+    # accumulate: when a session ended the process would never exit voluntarily,
+    # the SDK had to force-kill it after 60 s, leaving zombie processes that ate
+    # VM memory/CPU until the load threshold (0.85) was breached and the worker
+    # marked itself unavailable — causing the "agent offline" symptom.
+    disconnected = asyncio.Event()
+    ctx.room.on("disconnected", lambda: disconnected.set())
+    if not disconnected.is_set():
+        await disconnected.wait()
 
 
 if __name__ == "__main__":
-    agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint, agent_name="friday"))
+    agents.cli.run_app(agents.WorkerOptions(
+        entrypoint_fnc=entrypoint,
+        agent_name="friday",
+        # Raise from default 0.70 → 0.85: the VM was hitting 0.707 load with
+        # zero active sessions, locking out all new connections.
+        load_threshold=0.85,
+        # 0 idle processes: no pre-warmed pool to replenish.
+        #
+        # With num_idle_processes=1, after each session the SDK immediately tries
+        # to fork a replacement warm process. On the e2-micro (1 GB RAM) that fork
+        # competes with the still-running session for CPU, hits the ~10 s
+        # initialization timeout, gets killed, and the cascade of failed forks
+        # spikes load to 1.7+ → worker marks itself unavailable even with 0 active
+        # sessions.
+        #
+        # With 0 idle processes, no fork happens during a session. When the user
+        # next connects the worker spawns a fresh process on demand — the previous
+        # session has already exited by then so the VM is idle and initialization
+        # completes cleanly. Cold-start latency is ~10–15 s on this VM, which is
+        # acceptable and far better than "agent offline".
+        num_idle_processes=0,
+    ))
