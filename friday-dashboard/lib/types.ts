@@ -2,7 +2,8 @@ export interface FridayProfile {
   identity: {
     name: string;
     preferred_name: string;
-    age: number | null;
+    age: number | null;          // auto-computed from date_of_birth on save
+    date_of_birth: string | null; // "YYYY-MM-DD"
     timezone: string;
     location: string;
     language: string;
@@ -45,6 +46,7 @@ export interface FridayProfile {
     hobbies: string[];
     entertainment: string[];
     calendar_urls: string[];
+    world_clock_timezones: string[];  // IANA timezone IDs, e.g. ["Asia/Tokyo", "Europe/London"]
   };
   integrations: {
     garmin_enabled: boolean;
@@ -108,13 +110,13 @@ export interface CaptureLogEntry {
 }
 
 export const defaultProfile: FridayProfile = {
-  identity: { name: "", preferred_name: "", age: null, timezone: "", location: "", language: "en" },
+  identity: { name: "", preferred_name: "", age: null, date_of_birth: null, timezone: "", location: "", language: "en" },
   daily_routine: { wake_time: "", sleep_time: "", work_hours: "", work_days: [], habits: [] },
   health: { dietary_preferences: [], dietary_restrictions: [], fitness_goals: [], notes: "" },
   work_and_projects: { role: "", active_projects: [], skills: [], work_style: "" },
   goals: { short_term: [], long_term: [] },
   finance: { google_sheet_id: "", monthly_income: null, currency: "SGD", budget_allocations: { liabilities: null, personal_expense: null }, savings_goals: [], liabilities_list: [] },
   notes: [],
-  preferences: { communication_style: "casual", verbosity: "concise", hobbies: [], entertainment: [], calendar_urls: [] },
+  preferences: { communication_style: "casual", verbosity: "concise", hobbies: [], entertainment: [], calendar_urls: [], world_clock_timezones: [] },
   integrations: { garmin_enabled: false, garmin_metrics: ["steps", "distance", "heart_rate_avg", "stress_avg", "sleep_duration", "sleep_score", "body_battery"], garmin_email: "", garmin_password: "" },
 };

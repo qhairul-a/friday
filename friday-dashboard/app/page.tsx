@@ -8,6 +8,7 @@ import PageShell from "./components/page-shell";
 import VoiceOrb from "./components/voice-orb";
 import MobileSwipePanels from "./components/mobile-swipe-panels";
 import MobileBottomNav from "./components/mobile-bottom-nav";
+import { HealthAnalyticsPanel } from "./components/health-charts";
 import HealthWidget from "./components/health-widget";
 
 const PRIORITY_WEIGHT = { high: 3, normal: 2, low: 1 } as const;
@@ -28,6 +29,151 @@ function Widget({ title, icon, children, action }: {
         {action}
       </div>
       {children}
+    </div>
+  );
+}
+
+// ─── World clock panel ────────────────────────────────────────────────────────
+
+function WorldClockPanel() {
+  const [now, setNow] = useState(new Date());
+  const [timezones, setTimezones] = useState<string[]>([]);
+  const [editing, setEditing] = useState(false);
+  const [inputVal, setInputVal] = useState("");
+  const [inputError, setInputError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Tick every second
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Load timezone list from profile
+  useEffect(() => {
+    supabase.from("profiles").select("data").eq("user_id", USER_ID).single()
+      .then(({ data }) => {
+        const profile = ((data as { data?: unknown })?.data ?? {}) as import("@/lib/types").FridayProfile;
+        let tzList: string[] = profile?.preferences?.world_clock_timezones ?? [];
+        // Seed with home timezone if list is empty
+        if (tzList.length === 0 && profile?.identity?.timezone)
+          tzList = [profile.identity.timezone];
+        setTimezones(tzList);
+      });
+  }, []);
+
+  function cityLabel(tz: string) {
+    return tz.split("/").pop()!.replace(/_/g, " ");
+  }
+
+  function formatTime(tz: string) {
+    try {
+      return new Intl.DateTimeFormat("en-US", {
+        timeZone: tz, hour: "2-digit", minute: "2-digit",
+        second: "2-digit", hour12: false,
+      }).format(now);
+    } catch {
+      return "--:--:--";
+    }
+  }
+
+  function isValidTz(tz: string) {
+    try { Intl.DateTimeFormat(undefined, { timeZone: tz }); return true; }
+    catch { return false; }
+  }
+
+  async function saveTz(newList: string[]) {
+    setSaving(true);
+    try {
+      const { data } = await supabase.from("profiles").select("data").eq("user_id", USER_ID).single();
+      const profile = { ...((data as { data?: unknown })?.data as import("@/lib/types").FridayProfile ?? {}) };
+      profile.preferences = { ...profile.preferences, world_clock_timezones: newList };
+      await supabase.from("profiles").upsert({ user_id: USER_ID, data: profile, updated_at: new Date().toISOString() });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function addTz() {
+    const tz = inputVal.trim();
+    if (!isValidTz(tz)) { setInputError("Invalid timezone — use IANA format (e.g. Asia/Tokyo)"); return; }
+    if (timezones.includes(tz)) { setInputError("Already in list"); return; }
+    const next = [...timezones, tz];
+    setTimezones(next);
+    saveTz(next);
+    setInputVal(""); setInputError("");
+  }
+
+  function removeTz(tz: string) {
+    const next = timezones.filter(t => t !== tz);
+    setTimezones(next);
+    saveTz(next);
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-[#4a7a9b]">World Clock</p>
+        <button
+          onClick={() => { setEditing(e => !e); setInputVal(""); setInputError(""); }}
+          className="text-[10px] text-[#4a7a9b] hover:text-[#00d4ff] transition-colors"
+          title={editing ? "Done" : "Edit timezones"}
+        >
+          {editing ? "✓ done" : "⚙"}
+        </button>
+      </div>
+
+      {/* Clock list / Edit list */}
+      <div className="flex-1 overflow-y-auto flex flex-col gap-2" style={{ maxHeight: 160 }}>
+        {timezones.length === 0 && !editing && (
+          <p className="text-[10px] text-[#364c61] text-center py-2">No timezones — click ⚙ to add</p>
+        )}
+        {timezones.map((tz) => (
+          <div key={tz} className="flex items-center justify-between gap-1">
+            {editing ? (
+              <>
+                <span className="text-[10px] text-[#4a7a9b] truncate flex-1">{tz}</span>
+                <button
+                  onClick={() => removeTz(tz)}
+                  className="text-[10px] text-[#4a7a9b] hover:text-red-400 transition-colors shrink-0 ml-1"
+                >
+                  ×
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="text-[11px] text-white truncate">{cityLabel(tz)}</span>
+                <span className="text-[11px] font-mono text-[#00d4ff] shrink-0 tabular-nums">{formatTime(tz)}</span>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Add input (edit mode only) */}
+      {editing && (
+        <div className="mt-2 flex flex-col gap-1">
+          <div className="flex gap-1">
+            <input
+              type="text"
+              value={inputVal}
+              onChange={e => { setInputVal(e.target.value); setInputError(""); }}
+              onKeyDown={e => e.key === "Enter" && addTz()}
+              placeholder="e.g. Europe/Paris"
+              className="flex-1 min-w-0 bg-[#060e1c] border border-[#1a3a5c] rounded px-2 py-1 text-[10px] text-white placeholder-[#2a4a6b] focus:outline-none focus:border-[#00d4ff]/50"
+            />
+            <button
+              onClick={addTz}
+              disabled={saving || !inputVal.trim()}
+              className="px-2 py-1 text-[10px] text-[#00d4ff] border border-[#00d4ff]/30 rounded hover:bg-[#00d4ff]/10 transition-colors disabled:opacity-40"
+            >
+              + Add
+            </button>
+          </div>
+          {inputError && <p className="text-[9px] text-red-400">{inputError}</p>}
+        </div>
+      )}
     </div>
   );
 }
@@ -111,7 +257,7 @@ function CalendarWidget() {
 
   function load() {
     setRefreshing(true);
-    fetch("/api/calendar")
+    fetch(`/api/calendar?_t=${Date.now()}`)
       .then((r) => r.json())
       .then((data: CalendarEvent[]) => setEvents(data))
       .catch(() => setEvents([]))
@@ -127,32 +273,42 @@ function CalendarWidget() {
         <Link href="/onboarding" className="text-[10px] text-[#4a7a9b] hover:text-[#00d4ff] transition-colors">⚙</Link>
       </div>
     }>
-      <div className="flex gap-5">
-        {/* Left — month calendar */}
-        <MonthCalendar events={events ?? []} />
+      <div className="flex gap-4">
+        {/* ── Left 2/3 — month calendar + upcoming events ── */}
+        <div className="flex-[2] flex gap-5 min-w-0">
+          <MonthCalendar events={events ?? []} />
 
-        {/* Divider */}
+          {/* Inner divider */}
+          <div className="w-px bg-[#1a3a5c] shrink-0" />
+
+          {/* Upcoming events */}
+          <div className="flex-1 min-w-0">
+            {events === null ? (
+              <div className="text-[#4a7a9b] text-xs">Loading…</div>
+            ) : events.length === 0 ? (
+              <div className="text-[#4a7a9b] text-[11px] text-center py-1">No upcoming events</div>
+            ) : (
+              <div className="flex flex-col gap-1.5 overflow-y-auto" style={{ maxHeight: 180 }}>
+                {events.map((ev, i) => (
+                  <div key={i} className="flex items-start gap-2 bg-[#060e1c] rounded-lg px-2.5 py-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#00d4ff] shrink-0 mt-1" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11px] text-white truncate">{ev.title}</div>
+                      <div className="text-[10px] text-[#4a7a9b] mt-0.5">{ev.startStr}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Section divider ── */}
         <div className="w-px bg-[#1a3a5c] shrink-0" />
 
-        {/* Right — upcoming events */}
-        <div className="flex-1 min-w-0">
-          {events === null ? (
-            <div className="text-[#4a7a9b] text-xs">Loading…</div>
-          ) : events.length === 0 ? (
-            <div className="text-[#4a7a9b] text-[11px] text-center py-1">No upcoming events</div>
-          ) : (
-            <div className="flex flex-col gap-1.5 overflow-y-auto" style={{ maxHeight: 180 }}>
-              {events.map((ev, i) => (
-                <div key={i} className="flex items-start gap-2 bg-[#060e1c] rounded-lg px-2.5 py-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#00d4ff] shrink-0 mt-1" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[11px] text-white truncate">{ev.title}</div>
-                    <div className="text-[10px] text-[#4a7a9b] mt-0.5">{ev.startStr}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        {/* ── Right 1/3 — world clock ── */}
+        <div className="flex-[1] min-w-0">
+          <WorldClockPanel />
         </div>
       </div>
     </Widget>
@@ -331,6 +487,81 @@ function GoalsWidget() {
   );
 }
 
+// ─── Desktop panel slider ─────────────────────────────────────────────────────
+
+const DESKTOP_PANELS = ["Productivity", "Health"] as const;
+
+function DesktopPanelSlider() {
+  const [panel, setPanel] = useState(0);
+
+  return (
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Nav bar */}
+      <div className="shrink-0 flex items-center justify-center gap-4 px-6 py-3 border-b border-[#1a3a5c]">
+        <button
+          onClick={() => setPanel(p => Math.max(0, p - 1))}
+          disabled={panel === 0}
+          className="w-7 h-7 flex items-center justify-center rounded-lg text-[#4a7a9b] hover:text-[#00d4ff] hover:bg-[#0d2240] transition-colors disabled:opacity-25 disabled:cursor-not-allowed text-base"
+        >
+          ‹
+        </button>
+
+        <div className="flex items-center gap-3 min-w-[140px] justify-center">
+          <span className="text-xs font-semibold uppercase tracking-widest text-white">
+            {DESKTOP_PANELS[panel]}
+          </span>
+          <div className="flex gap-1.5">
+            {DESKTOP_PANELS.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setPanel(i)}
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                  i === panel ? "bg-[#00d4ff]" : "bg-[#1a3a5c] hover:bg-[#4a7a9b]"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={() => setPanel(p => Math.min(DESKTOP_PANELS.length - 1, p + 1))}
+          disabled={panel === DESKTOP_PANELS.length - 1}
+          className="w-7 h-7 flex items-center justify-center rounded-lg text-[#4a7a9b] hover:text-[#00d4ff] hover:bg-[#0d2240] transition-colors disabled:opacity-25 disabled:cursor-not-allowed text-base"
+        >
+          ›
+        </button>
+      </div>
+
+      {/* Slide container */}
+      <div className="flex-1 overflow-hidden">
+        <div
+          className="flex h-full transition-transform duration-300 ease-out"
+          style={{ transform: `translateX(-${panel * 100}%)` }}
+        >
+          {/* Panel 0 — Productivity */}
+          <div className="w-full shrink-0 overflow-y-auto p-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <CalendarWidget />
+              </div>
+              <RoutineWidget />
+              <TasksWidget />
+              <div className="col-span-2">
+                <GoalsWidget />
+              </div>
+            </div>
+          </div>
+
+          {/* Panel 1 — Health */}
+          <div className="w-full shrink-0 overflow-y-auto p-6">
+            <HealthAnalyticsPanel />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Mobile calendar panel (stacked: month view on top, events list below) ────
 
 function MobileCalendarPanel() {
@@ -339,7 +570,7 @@ function MobileCalendarPanel() {
 
   function load() {
     setRefreshing(true);
-    fetch("/api/calendar")
+    fetch(`/api/calendar?_t=${Date.now()}`)
       .then((r) => r.json())
       .then((data: CalendarEvent[]) => setEvents(data))
       .catch(() => setEvents([]))
@@ -428,22 +659,7 @@ export default function Dashboard() {
   if (!isMobile) {
     return (
       <PageShell>
-        <div className="p-6 h-full overflow-auto">
-          <div className="grid grid-cols-2 gap-4">
-            {/* Row 1 — Calendar (full width) */}
-            <div className="col-span-2">
-              <CalendarWidget />
-            </div>
-
-            {/* Row 2 — Routine (left) + Tasks (right) */}
-            <RoutineWidget />
-            <TasksWidget />
-
-            {/* Row 3 — Goals (left) + Health (right) */}
-            <GoalsWidget />
-            <HealthWidget />
-          </div>
-        </div>
+        <DesktopPanelSlider />
       </PageShell>
     );
   }
@@ -464,15 +680,14 @@ export default function Dashboard() {
       <MobileSwipePanels
         initialPanel={1}
         panels={[
-          // Panel 0 — Routine + Tasks + Health (stacked)
-          <div key="left" className="px-3 pt-3 pb-24 space-y-3 overflow-y-auto">
+          // Panel 0 — Routine + Tasks
+          <div key="productivity" className="px-3 pt-3 pb-24 space-y-3 overflow-y-auto">
             <RoutineWidget />
             <TasksWidget />
-            <HealthWidget />
           </div>,
 
           // Panel 1 — Voice orb (hero, center default)
-          <div key="center" className="relative flex flex-col items-center justify-center h-full pb-20">
+          <div key="orb" className="relative flex flex-col items-center justify-center h-full pb-20">
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={GRID_BG} />
             <div className="relative z-10" style={{ transform: "scale(0.78)", transformOrigin: "center center" }}>
               <VoiceOrb autoConnect />
@@ -480,7 +695,16 @@ export default function Dashboard() {
           </div>,
 
           // Panel 2 — Calendar: month view (top) + events list (bottom)
-          <MobileCalendarPanel key="right" />,
+          <MobileCalendarPanel key="calendar" />,
+
+          // Panel 3 — Health: widget snapshot + full analytics (scrollable)
+          <div key="health" className="px-3 pt-3 pb-24 overflow-y-auto">
+            <HealthWidget />
+            <div className="mt-3">
+              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#364c61] mb-3">Analytics</p>
+              <HealthAnalyticsPanel />
+            </div>
+          </div>,
         ]}
       />
 
