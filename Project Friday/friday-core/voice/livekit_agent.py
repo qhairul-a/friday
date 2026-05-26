@@ -385,10 +385,25 @@ async def entrypoint(ctx: agents.JobContext):
             return
 
     # Load profile and pending briefing concurrently while already connected.
-    profile, pending = await asyncio.gather(
+    # Use return_exceptions=True so a Supabase outage at startup doesn't crash the
+    # entrypoint silently. Without this, any exception from load_profile or
+    # get_pending_briefing propagates through gather and kills the process — the user
+    # sees Friday connect then immediately drop with no greeting and no error message.
+    results = await asyncio.gather(
         asyncio.to_thread(load_profile, user_id),
         asyncio.to_thread(get_pending_briefing, user_id),
+        return_exceptions=True,
     )
+    if isinstance(results[0], Exception):
+        print(f"[friday] Warning: load_profile failed ({results[0]}), using empty profile.")
+        profile = FridayProfile()
+    else:
+        profile = results[0]
+    if isinstance(results[1], Exception):
+        print(f"[friday] Warning: get_pending_briefing failed ({results[1]}), skipping briefing.")
+        pending = None
+    else:
+        pending = results[1]
 
     _anthropic_client = anthropic_sdk.AsyncClient(
         api_key=os.environ["ANTHROPIC_API_KEY"],
@@ -412,6 +427,14 @@ async def entrypoint(ctx: agents.JobContext):
     )
 
     agent = FridayVoiceAgent(profile, pending_briefing=pending)
+
+    # ── Register disconnect handler BEFORE session.start() ───────────────────
+    # If registered after generate_reply(), a disconnect during the greeting
+    # fires the event before the handler exists — disconnected never gets set —
+    # and the process waits forever, becoming a zombie that blocks the worker.
+    disconnected = asyncio.Event()
+    ctx.room.on("disconnected", lambda: disconnected.set())
+
     await session.start(
         agent,
         room=ctx.room,
@@ -429,7 +452,14 @@ async def entrypoint(ctx: agents.JobContext):
     else:
         greeting = "Greet the user briefly by name."
 
-    await session.generate_reply(instructions=greeting)
+    # Wrap the initial greeting so an Anthropic error (credits exhausted, rate
+    # limit, network blip) doesn't crash the entrypoint silently. Without this,
+    # Friday connects and says nothing — the "stuck listening" symptom. With this,
+    # the error is logged and Friday stays connected so the user can still speak.
+    try:
+        await session.generate_reply(instructions=greeting)
+    except Exception as e:
+        print(f"[friday] Warning: initial greeting failed ({e}). Friday is still listening.")
 
     # ── Wait for room disconnect before exiting ──────────────────────────────
     #
@@ -441,8 +471,6 @@ async def entrypoint(ctx: agents.JobContext):
     # the SDK had to force-kill it after 60 s, leaving zombie processes that ate
     # VM memory/CPU until the load threshold (0.85) was breached and the worker
     # marked itself unavailable — causing the "agent offline" symptom.
-    disconnected = asyncio.Event()
-    ctx.room.on("disconnected", lambda: disconnected.set())
     if not disconnected.is_set():
         await disconnected.wait()
 
