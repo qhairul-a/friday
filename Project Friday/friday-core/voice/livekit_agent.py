@@ -14,7 +14,7 @@ import httpx
 import anthropic as anthropic_sdk
 
 from livekit import agents, rtc
-from livekit.agents import AgentSession, Agent, function_tool, RoomInputOptions
+from livekit.agents import AgentSession, Agent, function_tool, room_io
 from livekit.plugins import deepgram, google, anthropic
 from google.cloud import texttospeech
 
@@ -31,13 +31,56 @@ from integrations.reminders import get_reminders, add_reminder, edit_reminder, m
 from integrations.garmin_health import get_health_today, get_health_trends
 
 
+def _build_profile_context(profile: FridayProfile) -> str:
+    """
+    Build a compact, safe profile summary for the system prompt.
+
+    Omits credentials (garmin_email/password), internal config (google_sheet_id,
+    calendar_urls), and caps notes at the 5 most recent entries.
+    Uses compact JSON (no indentation) — saves ~200–400 tokens vs indent=2.
+
+    The system prompt is stable across turns so Anthropic's ephemeral cache
+    applies: after the first message, these tokens cost ~10% of normal price.
+    """
+    import dataclasses
+    p = profile
+    ctx = {
+        "identity":          dataclasses.asdict(p.identity),
+        "daily_routine":     dataclasses.asdict(p.daily_routine),
+        "health":            dataclasses.asdict(p.health),
+        "work_and_projects": dataclasses.asdict(p.work_and_projects),
+        "goals":             dataclasses.asdict(p.goals),
+        "finance": {
+            "monthly_income":     p.finance.monthly_income,
+            "currency":           p.finance.currency,
+            "budget_allocations": p.finance.budget_allocations,
+            "savings_goals":      p.finance.savings_goals,
+            "liabilities_list":   p.finance.liabilities_list,
+            # google_sheet_id omitted — internal integration config
+        },
+        "notes": p.notes[-5:],  # most recent 5 only
+        "preferences": {
+            "communication_style": p.preferences.communication_style,
+            "verbosity":           p.preferences.verbosity,
+            "hobbies":             p.preferences.hobbies,
+            "entertainment":       p.preferences.entertainment,
+            # calendar_urls omitted — used by tools only, not conversation
+        },
+        # integrations section omitted entirely:
+        # garmin_email / garmin_password are credentials that must never
+        # be forwarded to the LLM.
+    }
+    import json
+    return json.dumps(ctx, separators=(",", ":"))  # compact — no whitespace tokens
+
+
 def _build_voice_instructions(profile: FridayProfile) -> str:
     raw = profile.identity.preferred_name or ""
     name = raw.split(";")[0].strip() or profile.identity.name or "there"
     tz = ZoneInfo(os.environ.get("TIMEZONE", "Asia/Singapore"))
     now = datetime.now(tz)
     today = now.strftime("%A, %d %B %Y, %I:%M %p")
-    profile_json = profile.to_json()
+    profile_ctx = _build_profile_context(profile)
     return f"""You are Friday, a personal AI assistant for {name}.
 
 Today is {today}.
@@ -71,7 +114,7 @@ Health rules:
 - Health data syncs every 4 hours. If data is missing, say it hasn't synced yet today.
 
 Here is everything you know about {name}:
-{profile_json}"""
+{profile_ctx}"""
 
 
 class FridayVoiceAgent(Agent):
@@ -357,8 +400,9 @@ async def entrypoint(ctx: agents.JobContext):
     session = AgentSession(
         stt=deepgram.STT(api_key=os.environ["DEEPGRAM_API_KEY"]),
         llm=anthropic.LLM(
-            model="claude-sonnet-4-6",
+            model="claude-haiku-4-5-20251001",
             client=_anthropic_client,
+            caching="ephemeral",       # cache system prompt — ~90% off on turns 2+
             _strict_tool_schema=False,
         ),
         tts=google.TTS(
@@ -374,7 +418,7 @@ async def entrypoint(ctx: agents.JobContext):
         # Keep the session alive when the user navigates away or closes the tab.
         # Without this, every disconnect triggers a new job dispatch on reconnect,
         # spawning a second competing process which exhausts the worker capacity.
-        room_input_options=RoomInputOptions(close_on_disconnect=False),
+        room_options=room_io.RoomOptions(close_on_disconnect=False),
     )
 
     if pending:
@@ -422,7 +466,12 @@ if __name__ == "__main__":
         # With 0 idle processes, no fork happens during a session. When the user
         # next connects the worker spawns a fresh process on demand — the previous
         # session has already exited by then so the VM is idle and initialization
-        # completes cleanly. Cold-start latency is ~10–15 s on this VM, which is
-        # acceptable and far better than "agent offline".
+        # completes cleanly.
         num_idle_processes=0,
+        # Cold Python startup (imports + module init) takes 12–20 s on this e2-micro.
+        # The SDK default is 10 s, which consistently kills the process before it can
+        # ack — causing the "did not connect" symptom after any idle period.
+        # 60 s gives plenty of headroom; there's no user-visible cost since the user
+        # is already waiting for the agent to come online.
+        initialize_process_timeout=60.0,
     ))
