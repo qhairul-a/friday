@@ -149,8 +149,10 @@ export default function AdminPage() {
   const netBalance = totalCollected - totalSpent
 
   // ── Media helpers ───────────────────────────────────────────────────────────
+  const ALLOWED_MIME = ['image/jpeg','image/png','image/gif','image/webp','video/mp4','video/webm','video/quicktime']
   const uploadToStorage = async (file: File): Promise<MediaItem | null> => {
-    const ext = file.name.split('.').pop() || 'jpg'
+    if (!ALLOWED_MIME.includes(file.type)) return null
+    const ext = file.type.split('/')[1].replace('quicktime', 'mov')
     const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
     const { data, error } = await supabase.storage.from('media').upload(path, file)
     if (error || !data) return null
