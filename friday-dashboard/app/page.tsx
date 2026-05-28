@@ -35,11 +35,77 @@ function Widget({ title, icon, children, action }: {
 
 // ─── World clock panel ────────────────────────────────────────────────────────
 
+const TZ_OPTIONS: { group: string; cities: { label: string; tz: string }[] }[] = [
+  { group: "Asia & Middle East", cities: [
+    { label: "Singapore",        tz: "Asia/Singapore" },
+    { label: "Kuala Lumpur",     tz: "Asia/Kuala_Lumpur" },
+    { label: "Jakarta",          tz: "Asia/Jakarta" },
+    { label: "Bangkok",          tz: "Asia/Bangkok" },
+    { label: "Ho Chi Minh City", tz: "Asia/Ho_Chi_Minh" },
+    { label: "Manila",           tz: "Asia/Manila" },
+    { label: "Hong Kong",        tz: "Asia/Hong_Kong" },
+    { label: "Taipei",           tz: "Asia/Taipei" },
+    { label: "Shanghai",         tz: "Asia/Shanghai" },
+    { label: "Seoul",            tz: "Asia/Seoul" },
+    { label: "Tokyo",            tz: "Asia/Tokyo" },
+    { label: "Kolkata",          tz: "Asia/Kolkata" },
+    { label: "Dhaka",            tz: "Asia/Dhaka" },
+    { label: "Karachi",          tz: "Asia/Karachi" },
+    { label: "Dubai",            tz: "Asia/Dubai" },
+    { label: "Riyadh",           tz: "Asia/Riyadh" },
+    { label: "Tehran",           tz: "Asia/Tehran" },
+    { label: "Istanbul",         tz: "Europe/Istanbul" },
+  ]},
+  { group: "Australia & Pacific", cities: [
+    { label: "Sydney",    tz: "Australia/Sydney" },
+    { label: "Melbourne", tz: "Australia/Melbourne" },
+    { label: "Brisbane",  tz: "Australia/Brisbane" },
+    { label: "Perth",     tz: "Australia/Perth" },
+    { label: "Auckland",  tz: "Pacific/Auckland" },
+    { label: "Honolulu",  tz: "Pacific/Honolulu" },
+  ]},
+  { group: "Europe", cities: [
+    { label: "London",    tz: "Europe/London" },
+    { label: "Dublin",    tz: "Europe/Dublin" },
+    { label: "Lisbon",    tz: "Europe/Lisbon" },
+    { label: "Paris",     tz: "Europe/Paris" },
+    { label: "Berlin",    tz: "Europe/Berlin" },
+    { label: "Amsterdam", tz: "Europe/Amsterdam" },
+    { label: "Rome",      tz: "Europe/Rome" },
+    { label: "Madrid",    tz: "Europe/Madrid" },
+    { label: "Zurich",    tz: "Europe/Zurich" },
+    { label: "Stockholm", tz: "Europe/Stockholm" },
+    { label: "Warsaw",    tz: "Europe/Warsaw" },
+    { label: "Moscow",    tz: "Europe/Moscow" },
+  ]},
+  { group: "Americas", cities: [
+    { label: "New York",     tz: "America/New_York" },
+    { label: "Toronto",      tz: "America/Toronto" },
+    { label: "Chicago",      tz: "America/Chicago" },
+    { label: "Denver",       tz: "America/Denver" },
+    { label: "Los Angeles",  tz: "America/Los_Angeles" },
+    { label: "Vancouver",    tz: "America/Vancouver" },
+    { label: "Mexico City",  tz: "America/Mexico_City" },
+    { label: "Bogotá",       tz: "America/Bogota" },
+    { label: "São Paulo",    tz: "America/Sao_Paulo" },
+    { label: "Buenos Aires", tz: "America/Argentina/Buenos_Aires" },
+  ]},
+  { group: "Africa", cities: [
+    { label: "Cairo",        tz: "Africa/Cairo" },
+    { label: "Lagos",        tz: "Africa/Lagos" },
+    { label: "Nairobi",      tz: "Africa/Nairobi" },
+    { label: "Johannesburg", tz: "Africa/Johannesburg" },
+  ]},
+  { group: "UTC", cities: [
+    { label: "UTC", tz: "UTC" },
+  ]},
+];
+
 function WorldClockPanel() {
   const [now, setNow] = useState(new Date());
   const [timezones, setTimezones] = useState<string[]>([]);
   const [editing, setEditing] = useState(false);
-  const [inputVal, setInputVal] = useState("");
+  const [selectVal, setSelectVal] = useState("");
   const [inputError, setInputError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -62,10 +128,6 @@ function WorldClockPanel() {
       });
   }, []);
 
-  function cityLabel(tz: string) {
-    return tz.split("/").pop()!.replace(/_/g, " ");
-  }
-
   function formatTime(tz: string) {
     try {
       return new Intl.DateTimeFormat("en-US", {
@@ -75,11 +137,6 @@ function WorldClockPanel() {
     } catch {
       return "--:--:--";
     }
-  }
-
-  function isValidTz(tz: string) {
-    try { Intl.DateTimeFormat(undefined, { timeZone: tz }); return true; }
-    catch { return false; }
   }
 
   async function saveTz(newList: string[]) {
@@ -95,13 +152,12 @@ function WorldClockPanel() {
   }
 
   function addTz() {
-    const tz = inputVal.trim();
-    if (!isValidTz(tz)) { setInputError("Invalid timezone — use IANA format (e.g. Asia/Tokyo)"); return; }
-    if (timezones.includes(tz)) { setInputError("Already in list"); return; }
-    const next = [...timezones, tz];
+    if (!selectVal) { setInputError("Please select a timezone"); return; }
+    if (timezones.includes(selectVal)) { setInputError("Already in list"); return; }
+    const next = [...timezones, selectVal];
     setTimezones(next);
     saveTz(next);
-    setInputVal(""); setInputError("");
+    setSelectVal(""); setInputError("");
   }
 
   function removeTz(tz: string) {
@@ -110,68 +166,89 @@ function WorldClockPanel() {
     saveTz(next);
   }
 
+  // Flatten all options for label lookup
+  const allOptions = TZ_OPTIONS.flatMap(g => g.cities);
+  const cityLabelFromOptions = (tz: string) =>
+    allOptions.find(o => o.tz === tz)?.label ?? tz.split("/").pop()!.replace(/_/g, " ");
+
+  // Already-added tzs to grey out in dropdown
+  const addedSet = new Set(timezones);
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-[#4a7a9b]">World Clock</p>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-bold uppercase tracking-widest text-[#4a7a9b]">World Clock</p>
         <button
-          onClick={() => { setEditing(e => !e); setInputVal(""); setInputError(""); }}
-          className="text-[10px] text-[#4a7a9b] hover:text-[#00d4ff] transition-colors"
+          onClick={() => { setEditing(e => !e); setSelectVal(""); setInputError(""); }}
+          className="text-xs font-semibold text-[#4a7a9b] hover:text-[#00d4ff] hover:bg-[#0d2240] px-2 py-1 rounded-md transition-all"
           title={editing ? "Done" : "Edit timezones"}
         >
-          {editing ? "✓ done" : "⚙"}
+          {editing ? "✓ Done" : "⚙ Edit"}
         </button>
       </div>
 
       {/* Clock list / Edit list */}
-      <div className="flex-1 overflow-y-auto flex flex-col gap-2" style={{ maxHeight: 160 }}>
+      <div className="flex-1 overflow-y-auto flex flex-col gap-2.5" style={{ maxHeight: 160 }}>
         {timezones.length === 0 && !editing && (
-          <p className="text-[10px] text-[#364c61] text-center py-2">No timezones — click ⚙ to add</p>
+          <p className="text-xs text-[#364c61] text-center py-3">No timezones — click ⚙ Edit to add</p>
         )}
         {timezones.map((tz) => (
-          <div key={tz} className="flex items-center justify-between gap-1">
+          <div key={tz} className="flex items-center justify-between gap-2">
             {editing ? (
               <>
-                <span className="text-[10px] text-[#4a7a9b] truncate flex-1">{tz}</span>
+                <span className="text-xs text-[#4a7a9b] truncate flex-1">{cityLabelFromOptions(tz)}</span>
                 <button
                   onClick={() => removeTz(tz)}
-                  className="text-[10px] text-[#4a7a9b] hover:text-red-400 transition-colors shrink-0 ml-1"
+                  className="text-sm font-bold text-[#4a7a9b] hover:text-red-400 hover:bg-red-400/10 w-7 h-7 flex items-center justify-center rounded-md transition-all shrink-0"
+                  title={`Remove ${tz}`}
                 >
                   ×
                 </button>
               </>
             ) : (
               <>
-                <span className="text-[11px] text-white truncate">{cityLabel(tz)}</span>
-                <span className="text-[11px] font-mono text-[#00d4ff] shrink-0 tabular-nums">{formatTime(tz)}</span>
+                <span className="text-sm text-white truncate">{cityLabelFromOptions(tz)}</span>
+                <span className="text-sm font-mono text-[#00d4ff] shrink-0 tabular-nums">{formatTime(tz)}</span>
               </>
             )}
           </div>
         ))}
       </div>
 
-      {/* Add input (edit mode only) */}
+      {/* Add dropdown (edit mode only) */}
       {editing && (
-        <div className="mt-2 flex flex-col gap-1">
-          <div className="flex gap-1">
-            <input
-              type="text"
-              value={inputVal}
-              onChange={e => { setInputVal(e.target.value); setInputError(""); }}
-              onKeyDown={e => e.key === "Enter" && addTz()}
-              placeholder="e.g. Europe/Paris"
-              className="flex-1 min-w-0 bg-[#060e1c] border border-[#1a3a5c] rounded px-2 py-1 text-[10px] text-white placeholder-[#2a4a6b] focus:outline-none focus:border-[#00d4ff]/50"
-            />
+        <div className="mt-3 flex flex-col gap-1.5">
+          <div className="flex gap-2">
+            <select
+              value={selectVal}
+              onChange={e => { setSelectVal(e.target.value); setInputError(""); }}
+              className="flex-1 min-w-0 bg-[#060e1c] border border-[#1a3a5c] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#00d4ff]/50 focus:ring-1 focus:ring-[#00d4ff]/20 cursor-pointer"
+            >
+              <option value="" disabled>Select a city…</option>
+              {TZ_OPTIONS.map(group => (
+                <optgroup key={group.group} label={group.group}>
+                  {group.cities.map(city => (
+                    <option
+                      key={city.tz}
+                      value={city.tz}
+                      disabled={addedSet.has(city.tz)}
+                    >
+                      {city.label}{addedSet.has(city.tz) ? " ✓" : ""}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
             <button
               onClick={addTz}
-              disabled={saving || !inputVal.trim()}
-              className="px-2 py-1 text-[10px] text-[#00d4ff] border border-[#00d4ff]/30 rounded hover:bg-[#00d4ff]/10 transition-colors disabled:opacity-40"
+              disabled={saving || !selectVal}
+              className="px-3 py-2 text-xs font-semibold text-[#00d4ff] border border-[#00d4ff]/40 rounded-lg hover:bg-[#00d4ff]/15 hover:border-[#00d4ff]/70 active:bg-[#00d4ff]/25 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               + Add
             </button>
           </div>
-          {inputError && <p className="text-[9px] text-red-400">{inputError}</p>}
+          {inputError && <p className="text-[10px] text-red-400">{inputError}</p>}
         </div>
       )}
     </div>

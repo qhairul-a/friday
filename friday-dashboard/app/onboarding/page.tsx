@@ -5,21 +5,51 @@ import Link from "next/link";
 import { supabase, USER_ID } from "@/lib/supabase";
 import { FridayProfile, defaultProfile, Briefing } from "@/lib/types";
 
-const SECTIONS = ["identity", "daily_routine", "health", "work_and_projects", "goals", "finance", "preferences", "calendar", "garmin_health", "briefings"] as const;
+const SECTIONS = [
+  "identity",
+  "routine_wellness",
+  "garmin_health",
+  "calendar",
+  "briefings",
+] as const;
 type Section = typeof SECTIONS[number];
 
 const SECTION_LABELS: Record<Section, string> = {
-  identity: "Identity",
-  daily_routine: "Daily Routine",
-  health: "Health & Wellness",
-  work_and_projects: "Work & Projects",
-  goals: "Goals",
-  finance: "Finance",
-  preferences: "Preferences",
-  calendar: "Calendar",
-  garmin_health: "Health Metrics",
-  briefings: "Briefings",
+  identity:         "Identity",
+  routine_wellness: "Routine & Wellness",
+  garmin_health:    "Health Metrics",
+  calendar:         "Calendar",
+  briefings:        "Briefings",
 };
+
+const SIDEBAR_GROUPS = [
+  {
+    header: "Account",
+    subgroups: [
+      { label: "Profile",      sections: ["identity", "routine_wellness", "garmin_health"] as const },
+      { label: "Productivity", sections: ["calendar", "briefings"] as const },
+    ],
+  },
+] as const;
+
+// ── DOB helpers ───────────────────────────────────────────────────────────────
+
+function calcFromDOB(dob: string): { age: number; daysUntilBirthday: number } | null {
+  if (!dob) return null;
+  const today = new Date();
+  const birth = new Date(dob + "T00:00:00");
+  if (isNaN(birth.getTime())) return null;
+
+  let age = today.getFullYear() - birth.getFullYear();
+  const mDiff = today.getMonth() - birth.getMonth();
+  if (mDiff < 0 || (mDiff === 0 && today.getDate() < birth.getDate())) age--;
+
+  const nextBirthday = new Date(today.getFullYear(), birth.getMonth(), birth.getDate());
+  if (nextBirthday.getTime() <= today.getTime()) nextBirthday.setFullYear(today.getFullYear() + 1);
+  const daysUntilBirthday = Math.round((nextBirthday.getTime() - today.getTime()) / 86400000);
+
+  return { age, daysUntilBirthday };
+}
 
 const GARMIN_METRICS: { key: string; label: string }[] = [
   { key: "steps",              label: "Steps" },
@@ -88,22 +118,33 @@ export default function OnboardingPage() {
         >
           ← Dashboard
         </Link>
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Sections</p>
-        {SECTIONS.map((s) => (
-          <button
-            key={s}
-            onClick={() => setActiveSection(s)}
-            className={`text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-              activeSection === s ? "bg-indigo-600 text-white" : "text-gray-300 hover:bg-gray-800"
-            }`}
-          >
-            {SECTION_LABELS[s]}
-          </button>
+        {SIDEBAR_GROUPS.map((group) => (
+          <div key={group.header}>
+            <p className="text-sm font-bold text-white px-3 mt-1 mb-3">
+              {group.header}
+            </p>
+            {group.subgroups.map((sub) => (
+              <div key={sub.label} className="mt-3">
+                <p className="text-xs font-semibold text-gray-300 px-3 mb-1">{sub.label}</p>
+                {sub.sections.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setActiveSection(s)}
+                    className={`text-left w-full px-3 py-1.5 rounded-lg text-[11px] transition-colors ${
+                      activeSection === s ? "bg-indigo-600 text-white" : "text-gray-400 hover:bg-gray-800"
+                    }`}
+                  >
+                    {SECTION_LABELS[s]}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
         ))}
       </aside>
 
       {/* Content */}
-      <main className="flex-1 p-8 max-w-2xl">
+      <main className="flex-1 p-8 max-w-3xl">
         <h1 className="text-2xl font-bold mb-1">Set up your profile</h1>
         <p className="text-gray-400 text-sm mb-8">Friday uses this to know who you are. Fill in what you can — she'll ask about the rest.</p>
 
@@ -111,83 +152,45 @@ export default function OnboardingPage() {
           <h2 className="text-lg font-semibold">{SECTION_LABELS[activeSection]}</h2>
 
           {activeSection === "identity" && (
-            <>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-4">
               <Field label="Full name" value={profile.identity.name} onChange={(v) => update("identity", "name", v)} />
-              <Field label="Preferred name" placeholder="e.g. Kai; Q; Boss" value={profile.identity.preferred_name} onChange={(v) => update("identity", "preferred_name", v)} hint="separate multiple names with ;" />
-              <Field label="Age" type="number" value={String(profile.identity.age ?? "")} onChange={(v) => update("identity", "age", v ? Number(v) : null)} />
-              <Field label="Location" value={profile.identity.location} onChange={(v) => update("identity", "location", v)} />
-              <Field label="Timezone" placeholder="e.g. Asia/Kuala_Lumpur" value={profile.identity.timezone} onChange={(v) => update("identity", "timezone", v)} />
-            </>
-          )}
-
-          {activeSection === "daily_routine" && (
-            <>
-              <Field label="Wake time" placeholder="e.g. 6:30 AM" value={profile.daily_routine.wake_time} onChange={(v) => update("daily_routine", "wake_time", v)} />
-              <Field label="Sleep time" placeholder="e.g. 11:00 PM" value={profile.daily_routine.sleep_time} onChange={(v) => update("daily_routine", "sleep_time", v)} />
-              <Field label="Work hours" placeholder="e.g. 9 AM – 6 PM" value={profile.daily_routine.work_hours} onChange={(v) => update("daily_routine", "work_hours", v)} />
-              <ListField label="Work days" hint="comma-separated" value={profile.daily_routine.work_days.join(", ")} onChange={(v) => updateList("daily_routine", "work_days", v)} />
-              <ListField label="Regular habits" hint="comma-separated, e.g. morning run, prayer" value={profile.daily_routine.habits.join(", ")} onChange={(v) => updateList("daily_routine", "habits", v)} />
-            </>
-          )}
-
-          {activeSection === "health" && (
-            <>
-              <ListField label="Dietary preferences" hint="e.g. halal, no pork" value={profile.health.dietary_preferences.join(", ")} onChange={(v) => updateList("health", "dietary_preferences", v)} />
-              <ListField label="Dietary restrictions" hint="e.g. lactose intolerant" value={profile.health.dietary_restrictions.join(", ")} onChange={(v) => updateList("health", "dietary_restrictions", v)} />
-              <ListField label="Fitness goals" hint="e.g. lose 5kg, run 3x/week" value={profile.health.fitness_goals.join(", ")} onChange={(v) => updateList("health", "fitness_goals", v)} />
-              <TextArea label="Other health notes" value={profile.health.notes} onChange={(v) => update("health", "notes", v)} />
-            </>
-          )}
-
-          {activeSection === "work_and_projects" && (
-            <>
-              <Field label="Current role / occupation" value={profile.work_and_projects.role} onChange={(v) => update("work_and_projects", "role", v)} />
-              <Field label="Work style" placeholder="e.g. deep work mornings, meetings afternoons" value={profile.work_and_projects.work_style} onChange={(v) => update("work_and_projects", "work_style", v)} />
-              <ListField label="Skills" hint="comma-separated" value={profile.work_and_projects.skills.join(", ")} onChange={(v) => updateList("work_and_projects", "skills", v)} />
-              <p className="text-xs text-gray-400">Active projects are added via Telegram or the profile page.</p>
-            </>
-          )}
-
-          {activeSection === "goals" && (
-            <>
-              <TextArea label="Short-term goals" placeholder="One per line" value={profile.goals.short_term.join("\n")} onChange={(v) => update("goals", "short_term", v.split("\n").filter(Boolean))} />
-              <TextArea label="Long-term goals" placeholder="One per line" value={profile.goals.long_term.join("\n")} onChange={(v) => update("goals", "long_term", v.split("\n").filter(Boolean))} />
-            </>
-          )}
-
-          {activeSection === "finance" && (
-            <>
-              <Field
-                label="Google Sheet URL"
-                placeholder="Paste your expenses sheet URL here"
-                value={profile.finance.google_sheet_id}
-                onChange={(v) => {
-                  const id = v.includes("/spreadsheets/d/") ? v.split("/spreadsheets/d/")[1].split("/")[0] : v;
-                  update("finance", "google_sheet_id", id);
-                }}
-              />
-              <Field label="Monthly income (SGD)" type="number" value={String(profile.finance.monthly_income ?? "")} onChange={(v) => update("finance", "monthly_income", v ? Number(v) : null)} />
-              <p className="text-sm font-medium text-gray-300 mt-2">Budget allocations (SGD/month)</p>
-              {Object.keys(profile.finance.budget_allocations).map((cat) => (
-                <Field
-                  key={cat}
-                  label={cat.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
-                  type="number"
-                  value={String((profile.finance.budget_allocations as Record<string, number | null>)[cat] ?? "")}
-                  onChange={(v) =>
+              <Field label="Preferred name" placeholder="e.g. Kai; Q; Boss" value={profile.identity.preferred_name} onChange={(v) => update("identity", "preferred_name", v)} hint="separate with ;" />
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Date of birth</label>
+                <input
+                  type="date"
+                  value={profile.identity.date_of_birth ?? ""}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => {
+                    const dob = e.target.value || null;
+                    const calc = dob ? calcFromDOB(dob) : null;
                     setProfile((prev) => ({
                       ...prev,
-                      finance: { ...prev.finance, budget_allocations: { ...prev.finance.budget_allocations, [cat]: v ? Number(v) : null } },
-                    }))
-                  }
+                      identity: {
+                        ...prev.identity,
+                        date_of_birth: dob,
+                        age: calc?.age ?? null,
+                      },
+                    }));
+                  }}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 [color-scheme:dark]"
                 />
-              ))}
-              <TextArea label="Savings goals" placeholder="One per line" value={profile.finance.savings_goals.join("\n")} onChange={(v) => update("finance", "savings_goals", v.split("\n").filter(Boolean))} />
-            </>
-          )}
+                {profile.identity.date_of_birth && (() => {
+                  const c = calcFromDOB(profile.identity.date_of_birth);
+                  if (!c) return null;
+                  return (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Age {c.age} · {c.daysUntilBirthday === 0 ? "🎂 Today!" : `🎂 in ${c.daysUntilBirthday} day${c.daysUntilBirthday !== 1 ? "s" : ""}`}
+                    </p>
+                  );
+                })()}
+              </div>
+              <Field label="Location" value={profile.identity.location} onChange={(v) => update("identity", "location", v)} />
+              <Field label="Timezone" placeholder="e.g. Asia/Kuala_Lumpur" value={profile.identity.timezone} onChange={(v) => update("identity", "timezone", v)} />
 
-          {activeSection === "preferences" && (
-            <>
+              <div className="col-span-2 border-t border-gray-800 pt-1" />
+              <p className="col-span-2 text-sm font-medium text-gray-400 -mt-2">Preferences</p>
+
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Communication style</label>
                 <select
@@ -212,7 +215,25 @@ export default function OnboardingPage() {
               </div>
               <ListField label="Hobbies" hint="comma-separated" value={profile.preferences.hobbies.join(", ")} onChange={(v) => updateList("preferences", "hobbies", v)} />
               <ListField label="Entertainment" hint="e.g. Netflix, FIFA, K-dramas" value={profile.preferences.entertainment.join(", ")} onChange={(v) => updateList("preferences", "entertainment", v)} />
-            </>
+            </div>
+          )}
+
+          {activeSection === "routine_wellness" && (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+              <Field label="Wake time" placeholder="e.g. 6:30 AM" value={profile.daily_routine.wake_time} onChange={(v) => update("daily_routine", "wake_time", v)} />
+              <Field label="Sleep time" placeholder="e.g. 11:00 PM" value={profile.daily_routine.sleep_time} onChange={(v) => update("daily_routine", "sleep_time", v)} />
+              <Field label="Work hours" placeholder="e.g. 9 AM – 6 PM" value={profile.daily_routine.work_hours} onChange={(v) => update("daily_routine", "work_hours", v)} />
+              <ListField label="Work days" hint="comma-separated" value={profile.daily_routine.work_days.join(", ")} onChange={(v) => updateList("daily_routine", "work_days", v)} />
+              <ListField label="Regular habits" hint="e.g. morning run, prayer" className="col-span-2" value={profile.daily_routine.habits.join(", ")} onChange={(v) => updateList("daily_routine", "habits", v)} />
+
+              <div className="col-span-2 border-t border-gray-800 pt-1" />
+              <p className="col-span-2 text-sm font-medium text-gray-400 -mt-2">Health & Wellness</p>
+
+              <ListField label="Dietary preferences" hint="e.g. halal, no pork" value={profile.health.dietary_preferences.join(", ")} onChange={(v) => updateList("health", "dietary_preferences", v)} />
+              <ListField label="Dietary restrictions" hint="e.g. lactose intolerant" value={profile.health.dietary_restrictions.join(", ")} onChange={(v) => updateList("health", "dietary_restrictions", v)} />
+              <ListField label="Fitness goals" hint="e.g. lose 5kg, run 3x/week" value={profile.health.fitness_goals.join(", ")} onChange={(v) => updateList("health", "fitness_goals", v)} />
+              <TextArea label="Other health notes" className="col-span-1" value={profile.health.notes} onChange={(v) => update("health", "notes", v)} />
+            </div>
           )}
 
           {activeSection === "calendar" && (
@@ -257,7 +278,7 @@ export default function OnboardingPage() {
           {activeSection === "garmin_health" && (
             <>
               {/* Credentials */}
-              <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <div>
                   <label className="block text-sm text-gray-400 mb-1">Garmin Connect email</label>
                   <input
@@ -288,7 +309,7 @@ export default function OnboardingPage() {
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="col-span-2 text-xs text-gray-500">
                   Same credentials you use to log in at connect.garmin.com. Stored in your private Supabase — never shared.
                 </p>
               </div>
@@ -632,11 +653,11 @@ function BriefingsSection() {
 
 // ─── Shared form components ───────────────────────────────────────────────────
 
-function Field({ label, value, onChange, type = "text", placeholder, hint }: {
-  label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; hint?: string;
+function Field({ label, value, onChange, type = "text", placeholder, hint, className }: {
+  label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; hint?: string; className?: string;
 }) {
   return (
-    <div>
+    <div className={className}>
       <label className="block text-sm text-gray-400 mb-1">
         {label}
         {hint && <span className="text-gray-600 ml-1">({hint})</span>}
@@ -652,11 +673,11 @@ function Field({ label, value, onChange, type = "text", placeholder, hint }: {
   );
 }
 
-function ListField({ label, value, onChange, hint }: {
-  label: string; value: string; onChange: (v: string) => void; hint?: string;
+function ListField({ label, value, onChange, hint, className }: {
+  label: string; value: string; onChange: (v: string) => void; hint?: string; className?: string;
 }) {
   return (
-    <div>
+    <div className={className}>
       <label className="block text-sm text-gray-400 mb-1">{label} {hint && <span className="text-gray-600">({hint})</span>}</label>
       <input
         value={value}
@@ -667,11 +688,11 @@ function ListField({ label, value, onChange, hint }: {
   );
 }
 
-function TextArea({ label, value, onChange, placeholder }: {
-  label: string; value: string; onChange: (v: string) => void; placeholder?: string;
+function TextArea({ label, value, onChange, placeholder, className }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; className?: string;
 }) {
   return (
-    <div>
+    <div className={className}>
       <label className="block text-sm text-gray-400 mb-1">{label}</label>
       <textarea
         value={value}

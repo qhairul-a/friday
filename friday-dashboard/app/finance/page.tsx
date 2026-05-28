@@ -444,7 +444,25 @@ export default function FinancePage() {
   const [savingsAccumulated, setSavingsAccumulated] = useState<{ total: number; by_category: Record<string, number> } | null>(null);
   const [loading, setLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(true);
+  const [editingIncome, setEditingIncome] = useState(false);
+  const [incomeInput, setIncomeInput] = useState("");
+  const [savingIncome, setSavingIncome] = useState(false);
   const { show, toggle } = useFinancePrivacy();
+
+  async function saveIncome() {
+    if (!profile) return;
+    const value = parseFloat(incomeInput);
+    if (isNaN(value)) return;
+    setSavingIncome(true);
+    const updated = { ...profile, finance: { ...profile.finance, monthly_income: value } };
+    await supabase.from("profiles").upsert(
+      { user_id: USER_ID, data: updated, updated_at: new Date().toISOString() },
+      { onConflict: "user_id" }
+    );
+    setProfile(updated);
+    setEditingIncome(false);
+    setSavingIncome(false);
+  }
 
   useEffect(() => {
     supabase
@@ -583,7 +601,39 @@ export default function FinancePage() {
                 const paidPct = fixedExpense > 0 ? Math.round((paidLiabilities / fixedExpense) * 100) : 0;
                 return (
                   <>
-                    <Row show={show} label="Monthly Income" value={`${cur} ${income.toLocaleString()}`} accent />
+                    {editingIncome ? (
+                      <div className="flex items-center justify-between py-2 border-b border-[#0d1e30]">
+                        <span className="text-sm text-[#4a7a9b]">Monthly Income</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-[#4a7a9b]">{cur}</span>
+                          <input
+                            type="number"
+                            value={incomeInput}
+                            onChange={(e) => setIncomeInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") saveIncome(); if (e.key === "Escape") setEditingIncome(false); }}
+                            autoFocus
+                            className="w-24 bg-[#0d2240] border border-[#1a3a5c] rounded px-2 py-0.5 text-xs text-white text-right focus:outline-none focus:border-[#00d4ff]"
+                          />
+                          <button onClick={saveIncome} disabled={savingIncome}
+                            className="text-[10px] text-[#00d4ff] hover:text-white transition-colors disabled:opacity-40">✓</button>
+                          <button onClick={() => setEditingIncome(false)}
+                            className="text-[10px] text-[#4a7a9b] hover:text-white transition-colors">✕</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between py-2 border-b border-[#0d1e30]">
+                        <span className="text-sm text-[#00d4ff]">Monthly Income</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-mono font-medium text-[#00d4ff]">
+                            <BlurValue show={show}>{cur} {income.toLocaleString()}</BlurValue>
+                          </span>
+                          <button
+                            onClick={() => { setIncomeInput(String(profile?.finance?.monthly_income ?? "")); setEditingIncome(true); }}
+                            className="text-[10px] text-[#4a7a9b] hover:text-[#00d4ff] transition-colors"
+                          >✎</button>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex items-center gap-3 py-2 border-b border-[#0d1e30]">
                       <span className="text-sm text-[#4a7a9b] shrink-0">Fixed Expense</span>
                       <div className="flex-1 flex items-center gap-2">

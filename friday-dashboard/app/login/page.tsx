@@ -125,7 +125,7 @@ export default function LoginPage() {
                   Authenticating…
                 </span>
               ) : (
-                "Activate Friday"
+                "Initiate"
               )}
             </button>
           </form>

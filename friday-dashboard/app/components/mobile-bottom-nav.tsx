@@ -8,8 +8,8 @@ const TABS = [
   { href: "/finance", icon: "◈", label: "Finance" },
   { href: "/tasks",   icon: "✓", label: "Tasks"   },
   { href: "/routine", icon: "☑", label: "Routine" },
-  { href: "/notes",   icon: "◱", label: "Notes"   },
   { href: "/goals",   icon: "◎", label: "Goals"   },
+  { href: "/health",  icon: "♡", label: "Health"  },
 ];
 
 export default function MobileBottomNav() {
