@@ -7,16 +7,27 @@ from zoneinfo import ZoneInfo
 
 # ─── iCal reading (no auth needed) ───────────────────────────────────────────
 
-def _parse_ical_date(raw: str) -> datetime | None:
+def _parse_ical_date(raw: str, tzid: str | None = None) -> datetime | None:
     clean = re.sub(r"^[^:]+:", "", raw).strip()
+    local_tz = ZoneInfo(os.environ.get("TIMEZONE", "Asia/Singapore"))
     try:
         if len(clean) == 8:
-            return datetime(int(clean[:4]), int(clean[4:6]), int(clean[6:8]), tzinfo=timezone.utc)
+            # All-day event — return as midnight in the user's local timezone
+            return datetime(int(clean[:4]), int(clean[4:6]), int(clean[6:8]), tzinfo=local_tz)
         if len(clean) >= 15:
             y, mo, d = int(clean[:4]), int(clean[4:6]), int(clean[6:8])
             h, mi, s = int(clean[9:11]), int(clean[11:13]), int(clean[13:15])
-            tz = timezone.utc if clean.endswith("Z") else None
-            return datetime(y, mo, d, h, mi, s, tzinfo=tz)
+            if clean.endswith("Z"):
+                # Explicit UTC — convert to local tz so _format_dt gets a correct aware dt
+                return datetime(y, mo, d, h, mi, s, tzinfo=timezone.utc)
+            elif tzid:
+                # TZID present — interpret the local wall-clock time in that zone
+                try:
+                    return datetime(y, mo, d, h, mi, s, tzinfo=ZoneInfo(tzid))
+                except Exception:
+                    pass
+            # No timezone info at all — assume user's local timezone (safer than UTC)
+            return datetime(y, mo, d, h, mi, s, tzinfo=local_tz)
     except ValueError:
         pass
     return None
@@ -55,17 +66,21 @@ def _parse_ical_events(ical: str) -> list[dict]:
     events = []
     for block in ical.split("BEGIN:VEVENT")[1:]:
         summary = re.search(r"^SUMMARY(?:;[^:]+)?:(.+)", block, re.MULTILINE)
-        dtstart = re.search(r"^DTSTART(?:;[^:]+)?:(.+)", block, re.MULTILINE)
+        dtstart = re.search(r"^(DTSTART[^:]*):(.+)", block, re.MULTILINE)
         if not summary or not dtstart:
             continue
         title = summary.group(1).strip().replace("\\,", ",").replace("\\n", " ").replace("\\", "")
-        start = _parse_ical_date(dtstart.group(1))
+        # Extract TZID from the property name (e.g. DTSTART;TZID=Asia/Singapore)
+        tzid_match = re.search(r"TZID=([^;:]+)", dtstart.group(1))
+        tzid = tzid_match.group(1).strip() if tzid_match else None
+        start = _parse_ical_date(dtstart.group(2), tzid)
         if not start:
             continue
-        start_utc = start if start.tzinfo else start.replace(tzinfo=timezone.utc)
+        # start is always timezone-aware now; convert to UTC for comparison
+        start_utc = start.astimezone(timezone.utc)
         if start_utc < now:
             continue
-        events.append({"title": title, "start": start_utc})
+        events.append({"title": title, "start": start})
     return events
 
 

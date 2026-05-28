@@ -91,6 +91,20 @@ def _migrate_preferences(prefs: dict) -> dict:
 
 
 @dataclass
+class Integrations:
+    garmin_enabled: bool = False
+    # Which metrics appear in Friday's spoken responses and the dashboard widget.
+    # All data is always stored in Supabase; this list only controls what's surfaced.
+    garmin_metrics: list = field(default_factory=lambda: [
+        "steps", "distance", "heart_rate_avg", "stress_avg",
+        "sleep_duration", "sleep_score", "body_battery"
+    ])
+    # Credentials entered via the Settings page — stored in Supabase, never in .env
+    garmin_email: str = ""
+    garmin_password: str = ""
+
+
+@dataclass
 class FridayProfile:
     identity: Identity = field(default_factory=Identity)
     daily_routine: DailyRoutine = field(default_factory=DailyRoutine)
@@ -100,6 +114,7 @@ class FridayProfile:
     finance: Finance = field(default_factory=Finance)
     notes: list = field(default_factory=list)
     preferences: Preferences = field(default_factory=Preferences)
+    integrations: Integrations = field(default_factory=Integrations)
 
     def to_dict(self) -> dict:
         import dataclasses
@@ -119,4 +134,5 @@ class FridayProfile:
             finance=_make(Finance, data.get("finance", {})),
             notes=data.get("notes", []),
             preferences=_make(Preferences, _migrate_preferences(data.get("preferences", {}))),
+            integrations=_make(Integrations, data.get("integrations", {})),
         )
