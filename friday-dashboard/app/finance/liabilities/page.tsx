@@ -126,7 +126,7 @@ function SortableRow({
   onStartEdit: (l: Liability) => void;
   onRemove: (id: string) => void;
 }) {
-  const isPaid = l.paid_month === month;
+  const isPaid = l.paid_month !== null;
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: l.id });
 
