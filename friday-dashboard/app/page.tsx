@@ -115,12 +115,16 @@ function WorldClockPanel() {
     return () => clearInterval(id);
   }, []);
 
-  // Load timezone list from profile
+  // Load timezone list — localStorage is the source of truth after first visit
   useEffect(() => {
     const cached = localStorage.getItem("friday_world_clock_timezones");
     if (cached) {
-      try { setTimezones(JSON.parse(cached)); } catch {}
+      try {
+        const parsed = JSON.parse(cached);
+        if (parsed.length > 0) { setTimezones(parsed); return; }
+      } catch {}
     }
+    // localStorage empty — bootstrap from Supabase once
     supabase.from("profiles").select("data").eq("user_id", USER_ID).single()
       .then(({ data }) => {
         const profile = ((data as { data?: unknown })?.data ?? {}) as import("@/lib/types").FridayProfile;
