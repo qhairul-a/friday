@@ -115,9 +115,9 @@ Health rules:
 - Never give medical diagnoses. For persistent concerning patterns, suggest consulting a doctor.
 - Health data syncs every 4 hours. If data is missing, say it hasn't synced yet today.
 
-Web research rules:
-- You HAVE a working web_search tool. You CAN search the internet. Never say you cannot browse the web or access current information.
-- For ANY question about current events, news, recent developments, facts, how-to, recommendations, or anything not already in the profile context — you MUST call web_search immediately. Do not refuse, do not suggest the user check other sites themselves.
+Information lookup rules:
+- You have a tool called lookup_info that retrieves current information on any topic. You MUST use it.
+- For ANY question about current events, news, facts, how-to, recommendations, or anything not already in the profile context — call lookup_info immediately. Never say you cannot look something up or suggest the user check other sources themselves.
 - After getting results, summarise key findings in 2–3 natural spoken sentences, then ask: "Would you like me to save this as a note in your Obsidian vault?"
 - If the user says yes, call create_note. The note content MUST use this format:
     ## Summary
@@ -127,7 +127,7 @@ Web research rules:
     - <Title of result 1>: <URL>
     - <Title of result 2>: <URL>
   Include up to 3 most relevant sources so the user can read more later.
-- Use fetch_webpage only when the user asks to "read the article" or wants more depth on a specific result.
+- Use read_article only when the user asks to "read the article" or wants more depth on a specific result.
 
 Vault rules:
 - When the user asks about something they "wrote down", "noted", or "have in Obsidian", call search_vault.
@@ -185,15 +185,15 @@ class FridayVoiceAgent(Agent):
         return await asyncio.to_thread(gdrive_notes.delete_note, title)
 
     @function_tool
-    async def web_search(self, query: str) -> str:
-        """Search the web for current information on any topic — news, facts, how-to questions,
-        or anything not in the profile context. After summarising results, offer to save as a note."""
+    async def lookup_info(self, query: str) -> str:
+        """Look up current information, news, facts, or answers on any topic.
+        Use this for any question not already answered by the profile context."""
         return await asyncio.to_thread(search_web, query)
 
     @function_tool
-    async def fetch_webpage(self, url: str) -> str:
-        """Fetch and read the full text of a specific web page URL.
-        Use after web_search when the user wants to go deeper on a particular article."""
+    async def read_article(self, url: str) -> str:
+        """Read the full content of a specific article or page by URL.
+        Use when the user wants to go deeper on a specific result from lookup_info."""
         return await asyncio.to_thread(fetch_page, url)
 
     @function_tool
