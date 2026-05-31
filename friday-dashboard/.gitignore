@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local deploy script (contains hook URL)
+deploy.ps1
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
