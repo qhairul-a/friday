@@ -209,6 +209,30 @@ export default function VariableExpensesPage() {
     await supabase.from("expenses").delete().eq("id", id);
   }
 
+  function exportCSV() {
+    const monthStr = month;
+    const rows: string[][] = [
+      ["Date", "Category", "Description", "Recorder", "Amount"],
+      ...(summary?.entries ?? []).map(e => [
+        e.date, e.category, e.description || "", e.recorder || "", e.amount.toFixed(2),
+      ]),
+      [],
+      ["Total", "", (summary?.total ?? 0).toFixed(2)],
+      ["Entries", "", String(summary?.count ?? 0)],
+      ...Object.entries(summary?.by_category ?? {})
+        .sort(([, a], [, b]) => (b as number) - (a as number))
+        .map(([cat, amt]) => [cat, "", (amt as number).toFixed(2)]),
+    ];
+    const csv = rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `expenses-${monthStr}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const currency = "SGD";
 
   const addForm = (
@@ -268,13 +292,22 @@ export default function VariableExpensesPage() {
             <h1 className="text-2xl font-bold text-white tracking-wide">Variable Expenses</h1>
             <p className="text-[#4a7a9b] text-sm mt-1">Daily expense log</p>
           </div>
-          <button
-            onClick={toggle}
-            className="text-[#4a7a9b] hover:text-[#00d4ff] transition-colors text-xl leading-none mt-1"
-            title={show ? "Hide figures" : "Show figures"}
-          >
-            {show ? "👁" : "🙈"}
-          </button>
+          <div className="flex items-center gap-3 mt-1">
+            <button
+              onClick={exportCSV}
+              disabled={!summary || summary.entries.length === 0}
+              className="text-[11px] text-[#4a7a9b] hover:text-white border border-[#1a3a5c] hover:border-[#4a7a9b] px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed uppercase tracking-wider"
+            >
+              Export CSV
+            </button>
+            <button
+              onClick={toggle}
+              className="text-[#4a7a9b] hover:text-[#00d4ff] transition-colors text-xl leading-none"
+              title={show ? "Hide figures" : "Show figures"}
+            >
+              {show ? "👁" : "🙈"}
+            </button>
+          </div>
         </div>
 
         {/* Month navigation */}
