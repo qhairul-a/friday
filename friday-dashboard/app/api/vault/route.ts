@@ -40,25 +40,30 @@ export async function GET(request: NextRequest): Promise<NextResponse<VaultRespo
   let folderId = searchParams.get("folderId");
   let vaultRootId: string | null = folderId;
 
-  // If no folderId given, discover the vault root by name
+  // If no folderId given, resolve vault root (env var ID takes priority over name search)
   if (!folderId) {
-    const vaultName = process.env.GDRIVE_VAULT_NAME ?? "Q _obsidian";
-    try {
-      const res = await drive.files.list({
-        q: `name='${vaultName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-        fields: "files(id)",
-        pageSize: 1,
-      });
-      folderId = res.data.files?.[0]?.id ?? null;
-      vaultRootId = folderId;
-    } catch (err) {
-      console.error("[vault] Failed to find vault root folder:", err);
-      return NextResponse.json({ items: [], vaultRootId: null });
-    }
-
-    if (!folderId) {
-      console.warn(`[vault] Vault folder '${vaultName}' not found in Drive`);
-      return NextResponse.json({ items: [], vaultRootId: null });
+    const envFolderId = process.env.GDRIVE_VAULT_FOLDER_ID ?? null;
+    if (envFolderId) {
+      folderId = envFolderId;
+      vaultRootId = envFolderId;
+    } else {
+      const vaultName = process.env.GDRIVE_VAULT_NAME ?? "Q _obsidian";
+      try {
+        const res = await drive.files.list({
+          q: `name='${vaultName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+          fields: "files(id)",
+          pageSize: 1,
+        });
+        folderId = res.data.files?.[0]?.id ?? null;
+        vaultRootId = folderId;
+      } catch (err) {
+        console.error("[vault] Failed to find vault root folder:", err);
+        return NextResponse.json({ items: [], vaultRootId: null });
+      }
+      if (!folderId) {
+        console.warn(`[vault] Vault folder '${vaultName}' not found in Drive`);
+        return NextResponse.json({ items: [], vaultRootId: null });
+      }
     }
   }
 

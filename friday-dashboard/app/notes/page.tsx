@@ -190,8 +190,7 @@ export default function NotesPage() {
         {!loading && notes.length === 0 && (
           <div className="bg-[#0a1628] border border-[#1a3a5c] rounded-xl p-10 text-center">
             <p className="text-[#4a7a9b] text-sm">No notes today.</p>
-            <p className="text-[#364c61] text-xs mt-1">Tell Friday to &quot;note that…&quot; on Telegram.</p>
-          </div>
+            </div>
         )}
 
         <div className="grid grid-cols-1 gap-3">

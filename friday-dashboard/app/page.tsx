@@ -117,14 +117,20 @@ function WorldClockPanel() {
 
   // Load timezone list from profile
   useEffect(() => {
+    const cached = localStorage.getItem("friday_world_clock_timezones");
+    if (cached) {
+      try { setTimezones(JSON.parse(cached)); } catch {}
+    }
     supabase.from("profiles").select("data").eq("user_id", USER_ID).single()
       .then(({ data }) => {
         const profile = ((data as { data?: unknown })?.data ?? {}) as import("@/lib/types").FridayProfile;
         let tzList: string[] = profile?.preferences?.world_clock_timezones ?? [];
-        // Seed with home timezone if list is empty
         if (tzList.length === 0 && profile?.identity?.timezone)
           tzList = [profile.identity.timezone];
-        setTimezones(tzList);
+        if (tzList.length > 0) {
+          setTimezones(tzList);
+          localStorage.setItem("friday_world_clock_timezones", JSON.stringify(tzList));
+        }
       });
   }, []);
 
@@ -140,6 +146,7 @@ function WorldClockPanel() {
   }
 
   async function saveTz(newList: string[]) {
+    localStorage.setItem("friday_world_clock_timezones", JSON.stringify(newList));
     setSaving(true);
     try {
       const { data } = await supabase.from("profiles").select("data").eq("user_id", USER_ID).single();
