@@ -29,8 +29,20 @@ from integrations.tasks import list_tasks, create_task, move_task, update_task
 from integrations.goals import get_goals, add_goal, update_goal, delete_goal
 from integrations.reminders import get_reminders, add_reminder, edit_reminder, mark_reminder_done, delete_reminder
 from integrations.garmin_health import get_health_today, get_health_trends
-from integrations.web_search import search_web, fetch_page
 from integrations.gdrive_notes import search_vault as _search_vault, read_vault_file as _read_vault_file
+from livekit.plugins.anthropic.tools import AnthropicTool
+
+
+class AnthropicWebSearch(AnthropicTool):
+    def __init__(self) -> None:
+        super().__init__(id="web_search")
+
+    @property
+    def beta_flag(self) -> str | None:
+        return "web-search-2025-03-05"
+
+    def to_dict(self) -> dict:
+        return {"type": "web_search_20250305", "name": "web_search"}
 
 
 def _build_profile_context(profile: FridayProfile) -> str:
@@ -115,19 +127,10 @@ Health rules:
 - Never give medical diagnoses. For persistent concerning patterns, suggest consulting a doctor.
 - Health data syncs every 4 hours. If data is missing, say it hasn't synced yet today.
 
-Information lookup rules:
-- You have a tool called lookup_info that retrieves current information on any topic. You MUST use it.
-- For ANY question about current events, news, facts, how-to, recommendations, or anything not already in the profile context — call lookup_info immediately. Never say you cannot look something up or suggest the user check other sources themselves.
-- After getting results, summarise key findings in 2–3 natural spoken sentences, then ask: "Would you like me to save this as a note in your Obsidian vault?"
-- If the user says yes, call create_note. The note content MUST use this format:
-    ## Summary
-    <your summary>
-
-    ## Sources
-    - <Title of result 1>: <URL>
-    - <Title of result 2>: <URL>
-  Include up to 3 most relevant sources so the user can read more later.
-- Use read_article only when the user asks to "read the article" or wants more depth on a specific result.
+Web search rules:
+- You have a native web_search tool. Use it freely for any question about current events, news, facts, recommendations, or anything not already in the profile context.
+- After searching, summarise findings in 2–3 natural spoken sentences, then ask: "Would you like me to save this as a note in Obsidian?"
+- If yes, call create_note. The note MUST include a ## Summary section and a ## Sources section with up to 3 URLs.
 
 Vault rules:
 - When the user asks about something they "wrote down", "noted", or "have in Obsidian", call search_vault.
@@ -142,7 +145,10 @@ class FridayVoiceAgent(Agent):
     def __init__(self, profile: FridayProfile, pending_briefing: dict | None = None):
         self._profile = profile
         self._pending_briefing = pending_briefing
-        super().__init__(instructions=_build_voice_instructions(profile))
+        super().__init__(
+            instructions=_build_voice_instructions(profile),
+            tools=[AnthropicWebSearch()],
+        )
 
     @function_tool
     async def deliver_briefing(self) -> str:
@@ -183,18 +189,6 @@ class FridayVoiceAgent(Agent):
     async def delete_note(self, title: str) -> str:
         """Delete a note by partial title match. Always confirm with user before calling."""
         return await asyncio.to_thread(gdrive_notes.delete_note, title)
-
-    @function_tool
-    async def lookup_info(self, query: str) -> str:
-        """Look up current information, news, facts, or answers on any topic.
-        Use this for any question not already answered by the profile context."""
-        return await asyncio.to_thread(search_web, query)
-
-    @function_tool
-    async def read_article(self, url: str) -> str:
-        """Read the full content of a specific article or page by URL.
-        Use when the user wants to go deeper on a specific result from lookup_info."""
-        return await asyncio.to_thread(fetch_page, url)
 
     @function_tool
     async def search_vault(self, query: str) -> str:
