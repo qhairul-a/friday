@@ -29,6 +29,8 @@ from integrations.tasks import list_tasks, create_task, move_task, update_task
 from integrations.goals import get_goals, add_goal, update_goal, delete_goal
 from integrations.reminders import get_reminders, add_reminder, edit_reminder, mark_reminder_done, delete_reminder
 from integrations.garmin_health import get_health_today, get_health_trends
+from integrations.web_search import search_web, fetch_page
+from integrations.gdrive_notes import search_vault as _search_vault, read_vault_file as _read_vault_file
 
 
 def _build_profile_context(profile: FridayProfile) -> str:
@@ -113,6 +115,24 @@ Health rules:
 - Never give medical diagnoses. For persistent concerning patterns, suggest consulting a doctor.
 - Health data syncs every 4 hours. If data is missing, say it hasn't synced yet today.
 
+Web research rules:
+- For current events, facts, how-to questions, or anything not in your profile context, call web_search.
+- After getting results, summarise key findings in 2–3 natural spoken sentences, then ask: "Would you like me to save this as a note in your Obsidian vault?"
+- If the user says yes, call create_note. The note content MUST use this format:
+    ## Summary
+    <your summary>
+
+    ## Sources
+    - <Title of result 1>: <URL>
+    - <Title of result 2>: <URL>
+  Include up to 3 most relevant sources so the user can read more later.
+- Use fetch_webpage only when the user asks to "read the article" or wants more depth on a specific result.
+
+Vault rules:
+- When the user asks about something they "wrote down", "noted", or "have in Obsidian", call search_vault.
+- search_vault searches ALL vault folders; search_notes searches only Friday-created notes.
+- To read a specific note in full, call read_vault_file.
+
 Here is everything you know about {name}:
 {profile_ctx}"""
 
@@ -162,6 +182,31 @@ class FridayVoiceAgent(Agent):
     async def delete_note(self, title: str) -> str:
         """Delete a note by partial title match. Always confirm with user before calling."""
         return await asyncio.to_thread(gdrive_notes.delete_note, title)
+
+    @function_tool
+    async def web_search(self, query: str) -> str:
+        """Search the web for current information on any topic — news, facts, how-to questions,
+        or anything not in the profile context. After summarising results, offer to save as a note."""
+        return await asyncio.to_thread(search_web, query)
+
+    @function_tool
+    async def fetch_webpage(self, url: str) -> str:
+        """Fetch and read the full text of a specific web page URL.
+        Use after web_search when the user wants to go deeper on a particular article."""
+        return await asyncio.to_thread(fetch_page, url)
+
+    @function_tool
+    async def search_vault(self, query: str) -> str:
+        """Search the entire Obsidian vault (all folders, not just Friday notes) for notes
+        matching the query. Use when the user asks about something they may have written
+        anywhere in their vault."""
+        return await asyncio.to_thread(_search_vault, query)
+
+    @function_tool
+    async def read_vault_file(self, filename: str) -> str:
+        """Read the full content of a specific Obsidian note from the vault by filename.
+        Use after search_vault when the user wants to hear the full text of a specific note."""
+        return await asyncio.to_thread(_read_vault_file, filename)
 
     @function_tool
     async def get_spending_summary(self, month: str = "") -> str:

@@ -226,6 +226,137 @@ def delete_note(title_query: str) -> str:
     return f"Deleted note: {display_title}"
 
 
+def _get_vault_folder_id(service) -> str:
+    """Returns the Drive folder ID for the root Obsidian vault (e.g. 'Q _obsidian')."""
+    vault_name = os.environ.get("GDRIVE_VAULT_NAME", "Q _obsidian")
+    result = service.files().list(
+        q=f"name='{vault_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false",
+        fields="files(id, name)",
+        pageSize=5,
+    ).execute()
+    folders = result.get("files", [])
+    if not folders:
+        raise RuntimeError(
+            f"Vault folder '{vault_name}' not found. Check GDRIVE_VAULT_NAME in .env."
+        )
+    return folders[0]["id"]
+
+
+def search_vault(query: str, max_results: int = 5) -> str:
+    """Search the entire Obsidian vault (all folders) using Google Drive full-text search."""
+    from googleapiclient.http import MediaIoBaseDownload
+
+    keywords = [kw.lower() for kw in query.split() if len(kw) > 2]
+    if not keywords:
+        return "Please provide a search term."
+
+    service = _get_service()
+    vault_id = _get_vault_folder_id(service)
+
+    seen: dict[str, dict] = {}
+
+    # Pass 1: search within the vault root's direct children (works for flat vaults)
+    for kw in keywords[:3]:
+        safe_kw = kw.replace("'", "\\'")
+        result = service.files().list(
+            q=(
+                f"'{vault_id}' in parents "
+                f"and fullText contains '{safe_kw}' "
+                f"and mimeType != 'application/vnd.google-apps.folder' "
+                f"and trashed=false"
+            ),
+            fields="files(id, name, modifiedTime)",
+            orderBy="modifiedTime desc",
+            pageSize=20,
+        ).execute()
+        for f in result.get("files", []):
+            if f["id"] not in seen:
+                seen[f["id"]] = f
+
+    # Pass 2 (fallback): Drive-wide .md search if vault is nested/no results from pass 1
+    if not seen:
+        for kw in keywords[:2]:
+            safe_kw = kw.replace("'", "\\'")
+            result = service.files().list(
+                q=(
+                    f"fullText contains '{safe_kw}' "
+                    f"and name contains '.md' "
+                    f"and trashed=false"
+                ),
+                fields="files(id, name, modifiedTime)",
+                orderBy="modifiedTime desc",
+                pageSize=15,
+            ).execute()
+            for f in result.get("files", []):
+                if f["id"] not in seen:
+                    seen[f["id"]] = f
+
+    if not seen:
+        return f"No notes found in vault matching '{query}'."
+
+    files = sorted(seen.values(), key=lambda x: x["modifiedTime"], reverse=True)[:max_results]
+
+    lines = [f"Found {len(files)} vault note(s) for '{query}':\n"]
+    for f in files:
+        try:
+            request = service.files().get_media(fileId=f["id"])
+            buf = io.BytesIO()
+            downloader = MediaIoBaseDownload(buf, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+            content = buf.getvalue().decode("utf-8", errors="replace")
+        except Exception:
+            content = ""
+
+        snippet_lines = [
+            ln for ln in content.splitlines()
+            if ln.strip() and not ln.startswith("#") and not ln.startswith("---")
+        ]
+        snippet = " ".join(snippet_lines)[:200]
+        display_title = re.sub(r"^\d{4}-\d{2}-\d{2} \d{4} ", "", f["name"].removesuffix(".md"))
+        lines.append(f"— {display_title}\n  {snippet}{'…' if len(snippet) == 200 else ''}\n")
+
+    return "\n".join(lines).strip()
+
+
+def read_vault_file(filename: str) -> str:
+    """Read the full content of an Obsidian vault note by partial filename."""
+    from googleapiclient.http import MediaIoBaseDownload
+
+    service = _get_service()
+    safe = filename.replace("'", "\\'")
+
+    result = service.files().list(
+        q=f"name contains '{safe}' and name contains '.md' and trashed=false",
+        fields="files(id, name)",
+        pageSize=10,
+    ).execute()
+    files = result.get("files", [])
+    matches = [f for f in files if filename.lower() in f["name"].lower()]
+
+    if not matches:
+        return f"No vault file found matching '{filename}'."
+    if len(matches) > 1:
+        names = ", ".join(
+            re.sub(r"^\d{4}-\d{2}-\d{2} \d{4} ", "", f["name"].removesuffix(".md"))
+            for f in matches[:4]
+        )
+        return f"Multiple files match '{filename}': {names}. Please be more specific."
+
+    f = matches[0]
+    try:
+        request = service.files().get_media(fileId=f["id"])
+        buf = io.BytesIO()
+        downloader = MediaIoBaseDownload(buf, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+        return buf.getvalue().decode("utf-8", errors="replace")
+    except Exception as e:
+        return f"Could not read '{f['name']}': {e}"
+
+
 def search_notes(query: str, max_results: int = 5) -> str:
     """Search notes in the Friday folder using Google Drive full-text search."""
     from googleapiclient.http import MediaIoBaseDownload
