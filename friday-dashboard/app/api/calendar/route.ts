@@ -77,20 +77,6 @@ async function fetchGoogleCalendarAPI(): Promise<CalendarEvent[] | null> {
   let clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   let refreshToken = process.env.GOOGLE_CALENDAR_REFRESH_TOKEN;
 
-  // If dedicated calendar credentials aren't set, try reusing the Drive OAuth credentials.
-  // This works when the same Google Cloud OAuth app was granted Calendar scope.
-  if (!clientId || !clientSecret || !refreshToken) {
-    const driveToken = process.env.GDRIVE_NOTES_TOKEN;
-    if (driveToken) {
-      try {
-        const creds = JSON.parse(driveToken);
-        clientId     = creds.client_id;
-        clientSecret = creds.client_secret;
-        refreshToken = creds.refresh_token;
-      } catch { /* malformed token — fall through */ }
-    }
-  }
-
   if (!clientId || !clientSecret || !refreshToken) return null; // not configured → fall back to iCal
 
   // 1. Exchange refresh token for a fresh access token
