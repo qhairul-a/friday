@@ -15,4 +15,4 @@ livekit-plugins-deepgram>=0.6.0
 livekit-plugins-google>=0.3.0
 livekit-plugins-anthropic>=0.3.0
 deepgram-sdk>=3.0.0
-duckduckgo_search>=6.0.0
+tavily-python>=0.3.0

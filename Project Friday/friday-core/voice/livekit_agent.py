@@ -30,19 +30,7 @@ from integrations.goals import get_goals, add_goal, update_goal, delete_goal
 from integrations.reminders import get_reminders, add_reminder, edit_reminder, mark_reminder_done, delete_reminder
 from integrations.garmin_health import get_health_today, get_health_trends
 from integrations.gdrive_notes import search_vault as _search_vault, read_vault_file as _read_vault_file
-from livekit.plugins.anthropic.tools import AnthropicTool
-
-
-class AnthropicWebSearch(AnthropicTool):
-    def __init__(self) -> None:
-        super().__init__(id="web_search")
-
-    @property
-    def beta_flag(self) -> str | None:
-        return "web-search-2025-03-05"
-
-    def to_dict(self) -> dict:
-        return {"type": "web_search_20250305", "name": "web_search"}
+from integrations.web_search import search_web as _search_web
 
 
 def _build_profile_context(profile: FridayProfile) -> str:
@@ -128,9 +116,9 @@ Health rules:
 - Health data syncs every 4 hours. If data is missing, say it hasn't synced yet today.
 
 Web search rules:
-- You have a native web_search tool. Use it freely for any question about current events, news, facts, recommendations, or anything not already in the profile context.
+- You have a working search_web tool. You MUST call it for any question about current events, news, facts, how-to, recommendations, or anything not already in the profile context. Never refuse.
 - After searching, summarise findings in 2–3 natural spoken sentences, then ask: "Would you like me to save this as a note in Obsidian?"
-- If yes, call create_note. The note MUST include a ## Summary section and a ## Sources section with up to 3 URLs.
+- If yes, call create_note. The note MUST include a ## Summary section and a ## Sources section with up to 3 titled URLs.
 
 Vault rules:
 - When the user asks about something they "wrote down", "noted", or "have in Obsidian", call search_vault.
@@ -147,7 +135,6 @@ class FridayVoiceAgent(Agent):
         self._pending_briefing = pending_briefing
         super().__init__(
             instructions=_build_voice_instructions(profile),
-            tools=[AnthropicWebSearch()],
         )
 
     @function_tool
@@ -189,6 +176,13 @@ class FridayVoiceAgent(Agent):
     async def delete_note(self, title: str) -> str:
         """Delete a note by partial title match. Always confirm with user before calling."""
         return await asyncio.to_thread(gdrive_notes.delete_note, title)
+
+    @function_tool
+    async def search_web(self, query: str) -> str:
+        """Search the internet for current information, news, facts, or answers on any topic.
+        ALWAYS call this for questions about current events, news, or anything not in the profile.
+        Never refuse — you have this capability. After results, summarise and offer to save as a note."""
+        return await asyncio.to_thread(_search_web, query)
 
     @function_tool
     async def search_vault(self, query: str) -> str:
@@ -455,7 +449,7 @@ async def entrypoint(ctx: agents.JobContext):
     session = AgentSession(
         stt=deepgram.STT(api_key=os.environ["DEEPGRAM_API_KEY"]),
         llm=anthropic.LLM(
-            model="claude-haiku-4-5-20251001",
+            model="claude-sonnet-4-6",
             client=_anthropic_client,
             caching="ephemeral",       # cache system prompt — ~90% off on turns 2+
             _strict_tool_schema=False,
