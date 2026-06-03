@@ -22,15 +22,7 @@ const MAIN_NAV = [
       { href: "/finance/variable-expenses", label: "Variable Expenses" },
     ],
   },
-  {
-    href: "/tasks",
-    label: "Tasks",
-    icon: "✓",
-    sub: [
-      { href: "/tasks",         label: "Kanban Board" },
-      { href: "/tasks/archive", label: "Archive"      },
-    ],
-  },
+  { href: "/things-to-do", label: "Things to Do", icon: "◻" },
   { href: "/routine", label: "Routine", icon: "☑" },
   { href: "/goals",   label: "Goals",   icon: "◎" },
   { href: "/notes",   label: "Notes",   icon: "◱" },
