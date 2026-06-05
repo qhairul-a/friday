@@ -12,36 +12,45 @@ import {
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
 
+// ─── Module-scope types and constants ────────────────────────────────────────
+
+type Turn = { id: string; from: "user" | "friday"; text: string; startTime: number };
+
+const STATE_COLORS: Record<string, string> = {
+  listening: "var(--cyan)",
+  thinking: "var(--violet)",
+  speaking: "var(--orange)",
+};
+
+const STATE_LABELS: Record<string, string> = {
+  disconnected: "Disconnected",
+  connecting: "Connecting…",
+  initializing: "Initializing…",
+  "pre-connect-buffering": "Buffering…",
+  listening: "Listening",
+  thinking: "Thinking",
+  speaking: "Speaking",
+  failed: "Failed",
+  idle: "Idle",
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function PanelContent({ onDisconnect }: { onDisconnect: () => void }) {
   const { state, audioTrack, agentTranscriptions } = useVoiceAssistant();
   const { localParticipant } = useLocalParticipant();
 
-  const stateColors: Record<string, string> = {
-    listening: "var(--cyan)",
-    thinking: "var(--violet)",
-    speaking: "var(--orange)",
-  };
-  const stateColor = stateColors[state] ?? "var(--text-3)";
-
-  const stateLabel: Record<string, string> = {
-    disconnected: "Disconnected",
-    connecting: "Connecting…",
-    initializing: "Initializing…",
-    listening: "Listening",
-    thinking: "Thinking",
-    speaking: "Speaking",
-  };
+  const stateColor = STATE_COLORS[state] ?? "var(--text-3)";
 
   // Resolve local mic track for user transcription
   const micPub = localParticipant?.getTrackPublication(Track.Source.Microphone);
   const localMicRef = micPub && localParticipant
     ? { participant: localParticipant, publication: micPub, source: Track.Source.Microphone as const }
     : undefined;
+  // useTrackTranscription is @deprecated; migrate to useTranscriptions() when the library ships a replacement that surfaces non-final segments
   const { segments: userSegments } = useTrackTranscription(localMicRef);
 
   // Build unified turn list
-  type Turn = { id: string; from: "user" | "friday"; text: string; startTime: number };
-
   const finalTurns: Turn[] = [
     ...agentTranscriptions
       .filter(s => s.final)
@@ -63,7 +72,6 @@ function PanelContent({ onDisconnect }: { onDisconnect: () => void }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <style>{`@keyframes friday-blink{0%,100%{opacity:1}50%{opacity:0}}`}</style>
 
       {/* Header */}
       <div style={{
@@ -83,7 +91,7 @@ function PanelContent({ onDisconnect }: { onDisconnect: () => void }) {
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <div style={{ width: 6, height: 6, borderRadius: "50%", background: stateColor, boxShadow: `0 0 6px ${stateColor}` }} />
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-            {stateLabel[state] ?? state}
+            {STATE_LABELS[state] ?? state}
           </span>
         </div>
         <button onClick={onDisconnect} className="btn-icon" style={{ fontSize: 11 }}>✕</button>
@@ -158,14 +166,14 @@ function PanelContent({ onDisconnect }: { onDisconnect: () => void }) {
                       display: "inline-block",
                       width: 2,
                       height: "1em",
-                      background: "#a78bfa",
+                      background: "var(--violet)",
                       marginLeft: 2,
                       verticalAlign: "middle",
                       animation: "friday-blink 0.9s step-end infinite",
                     }} />
                   </div>
                 </div>
-                <span style={{ fontSize: 10, color: "#6b4fa8", fontFamily: "var(--font-mono)", paddingLeft: 4 }}>
+                <span style={{ fontSize: 10, color: "var(--violet)", opacity: 0.7, fontFamily: "var(--font-mono)", paddingLeft: 4 }}>
                   Friday speaking…
                 </span>
               </div>
