@@ -1,0 +1,289 @@
+"use client";
+
+import { useState, useCallback, useRef, useEffect } from "react";
+import {
+  LiveKitRoom,
+  RoomAudioRenderer,
+  useVoiceAssistant,
+  BarVisualizer,
+  VoiceAssistantControlBar,
+  useLocalParticipant,
+  useTrackTranscription,
+} from "@livekit/components-react";
+import { Track } from "livekit-client";
+
+function PanelContent({ onDisconnect }: { onDisconnect: () => void }) {
+  const { state, audioTrack, agentTranscriptions } = useVoiceAssistant();
+  const { localParticipant } = useLocalParticipant();
+
+  const stateColors: Record<string, string> = {
+    listening: "var(--cyan)",
+    thinking: "var(--violet)",
+    speaking: "var(--orange)",
+  };
+  const stateColor = stateColors[state] ?? "var(--text-3)";
+
+  const stateLabel: Record<string, string> = {
+    disconnected: "Disconnected",
+    connecting: "Connecting…",
+    initializing: "Initializing…",
+    listening: "Listening",
+    thinking: "Thinking",
+    speaking: "Speaking",
+  };
+
+  // Resolve local mic track for user transcription
+  const micPub = localParticipant?.getTrackPublication(Track.Source.Microphone);
+  const localMicRef = micPub && localParticipant
+    ? { participant: localParticipant, publication: micPub, source: Track.Source.Microphone as const }
+    : undefined;
+  const { segments: userSegments } = useTrackTranscription(localMicRef);
+
+  // Build unified turn list
+  type Turn = { id: string; from: "user" | "friday"; text: string; startTime: number };
+
+  const finalTurns: Turn[] = [
+    ...agentTranscriptions
+      .filter(s => s.final)
+      .map(s => ({ id: s.id, from: "friday" as const, text: s.text, startTime: s.startTime })),
+    ...userSegments
+      .filter(s => s.final)
+      .map(s => ({ id: s.id, from: "user" as const, text: s.text, startTime: s.startTime })),
+  ].sort((a, b) => a.startTime - b.startTime);
+
+  const liveAgentTurn = agentTranscriptions.find(s => !s.final);
+  const liveUserTurn  = userSegments.find(s => !s.final);
+
+  const bottomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [finalTurns.length, liveAgentTurn?.text, liveUserTurn?.text]);
+
+  const isEmpty = finalTurns.length === 0 && !liveAgentTurn && !liveUserTurn;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <style>{`@keyframes friday-blink{0%,100%{opacity:1}50%{opacity:0}}`}</style>
+
+      {/* Header */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "14px 16px",
+        borderBottom: "1px solid var(--border)",
+      }}>
+        <span style={{
+          fontFamily: "var(--font-space)",
+          fontSize: 13,
+          fontWeight: 600,
+          color: "var(--cyan)",
+          letterSpacing: "0.1em",
+        }}>FRIDAY</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: stateColor, boxShadow: `0 0 6px ${stateColor}` }} />
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            {stateLabel[state] ?? state}
+          </span>
+        </div>
+        <button onClick={onDisconnect} className="btn-icon" style={{ fontSize: 11 }}>✕</button>
+      </div>
+
+      {/* Transcript */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+        {isEmpty ? (
+          <p style={{ color: "var(--text-3)", fontSize: 12, textAlign: "center", marginTop: 20, fontFamily: "var(--font-mono)" }}>
+            Speak to begin…
+          </p>
+        ) : (
+          <>
+            {finalTurns.map(turn => (
+              <div key={turn.id} style={{ display: "flex", justifyContent: turn.from === "user" ? "flex-end" : "flex-start" }}>
+                <div style={{
+                  maxWidth: "82%",
+                  padding: "8px 12px",
+                  borderRadius: turn.from === "user" ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
+                  background: turn.from === "user" ? "var(--cyan-dim)" : "rgba(167,139,250,0.1)",
+                  border: `1px solid ${turn.from === "user" ? "rgba(34,211,238,0.2)" : "rgba(167,139,250,0.2)"}`,
+                  color: "var(--text-1)",
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                }}>
+                  {turn.text}
+                </div>
+              </div>
+            ))}
+
+            {liveUserTurn && (
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <div style={{
+                  maxWidth: "82%",
+                  padding: "8px 12px",
+                  borderRadius: "12px 12px 2px 12px",
+                  background: "var(--cyan-dim)",
+                  border: "1px solid rgba(34,211,238,0.35)",
+                  color: "var(--text-1)",
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                }}>
+                  {liveUserTurn.text}
+                  <span style={{
+                    display: "inline-block",
+                    width: 2,
+                    height: "1em",
+                    background: "var(--cyan)",
+                    marginLeft: 2,
+                    verticalAlign: "middle",
+                    animation: "friday-blink 0.9s step-end infinite",
+                  }} />
+                </div>
+              </div>
+            )}
+
+            {liveAgentTurn && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                  <div style={{
+                    maxWidth: "82%",
+                    padding: "8px 12px",
+                    borderRadius: "12px 12px 12px 2px",
+                    background: "rgba(167,139,250,0.15)",
+                    border: "1px solid rgba(167,139,250,0.35)",
+                    color: "var(--text-1)",
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                  }}>
+                    {liveAgentTurn.text}
+                    <span style={{
+                      display: "inline-block",
+                      width: 2,
+                      height: "1em",
+                      background: "#a78bfa",
+                      marginLeft: 2,
+                      verticalAlign: "middle",
+                      animation: "friday-blink 0.9s step-end infinite",
+                    }} />
+                  </div>
+                </div>
+                <span style={{ fontSize: 10, color: "#6b4fa8", fontFamily: "var(--font-mono)", paddingLeft: 4 }}>
+                  Friday speaking…
+                </span>
+              </div>
+            )}
+          </>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Visualizer + Controls */}
+      <div style={{ padding: "12px 14px", borderTop: "1px solid var(--border)" }}>
+        <div style={{ height: 36, marginBottom: 8 }}>
+          <BarVisualizer state={state} trackRef={audioTrack} barCount={20} style={{ width: "100%", height: "100%" }} />
+        </div>
+        <VoiceAssistantControlBar />
+      </div>
+    </div>
+  );
+}
+
+export default function VoicePanel() {
+  const [open, setOpen] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL ?? "";
+
+  const connect = useCallback(async () => {
+    setConnecting(true);
+    try {
+      const res = await fetch("/api/livekit-token");
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setToken(data.token);
+      setOpen(true);
+    } catch (err) {
+      console.error("[VoicePanel] connect error:", err);
+      alert("Could not connect to Friday. Check console for details.");
+    } finally {
+      setConnecting(false);
+    }
+  }, []);
+
+  const disconnect = useCallback(() => {
+    setToken(null);
+    setOpen(false);
+  }, []);
+
+  return (
+    <>
+      {!open && (
+        <button
+          onClick={connect}
+          disabled={connecting}
+          style={{
+            position: "fixed",
+            bottom: 28,
+            right: 28,
+            zIndex: 50,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "12px 22px",
+            background: "linear-gradient(135deg, var(--cyan) 0%, var(--violet) 100%)",
+            color: "var(--bg-base)",
+            fontFamily: "var(--font-space)",
+            fontWeight: 600,
+            fontSize: 13,
+            border: "none",
+            borderRadius: 100,
+            cursor: "pointer",
+            boxShadow: "0 4px 24px rgba(34,211,238,0.25)",
+            transition: "transform 0.15s, box-shadow 0.15s",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)";
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 32px rgba(34,211,238,0.35)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 24px rgba(34,211,238,0.25)";
+          }}
+        >
+          {connecting ? "Connecting…" : "🎙 Talk to Friday"}
+        </button>
+      )}
+
+      {open && token && (
+        <div
+          className="glass"
+          style={{
+            position: "fixed",
+            bottom: 0,
+            right: 0,
+            zIndex: 50,
+            width: 320,
+            height: 420,
+            borderTopLeftRadius: 20,
+            borderBottomLeftRadius: 0,
+            borderBottomRightRadius: 0,
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 -8px 48px rgba(34,211,238,0.12)",
+            overflow: "hidden",
+          }}
+        >
+          <LiveKitRoom
+            token={token}
+            serverUrl={livekitUrl}
+            connect
+            audio
+            onDisconnected={disconnect}
+            style={{ display: "contents" }}
+          >
+            <RoomAudioRenderer />
+            <PanelContent onDisconnect={disconnect} />
+          </LiveKitRoom>
+        </div>
+      )}
+    </>
+  );
+}
