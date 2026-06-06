@@ -54,15 +54,15 @@ h1, h2, h3, h4 { font-family: var(--font-space); }
 
 /* ─── Glass card ─────────────────────────────────────────────────────────────── */
 .glass {
-  background: var(--bg-surface);
+  background: rgba(13, 28, 52, 0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(34, 211, 238, 0.18);
   border-radius: 16px;
 }
 
 .glass:hover {
-  border-color: rgba(34,211,238,0.22);
+  border-color: rgba(34,211,238,0.32);
 }
 
 .glass-elevated {
@@ -75,7 +75,7 @@ h1, h2, h3, h4 { font-family: var(--font-space); }
 
 /* ─── Glow effects ───────────────────────────────────────────────────────────── */
 .glow-cyan {
-  box-shadow: 0 0 24px rgba(34,211,238,0.12), inset 0 1px 0 rgba(34,211,238,0.1);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4), 0 0 24px rgba(34,211,238,0.08), inset 0 1px 0 rgba(34,211,238,0.12);
 }
 
 .glow-text {
@@ -308,3 +308,17 @@ select.cyber-input {
 }
 .drag-handle:hover { color: var(--cyan); background: var(--cyan-dim); }
 .drag-handle:active { cursor: grabbing; }
+
+/* ─── Widget slot (height-resizable) ──────────────────────────────────────────── */
+.widget-slot {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.widget-slot > .glass,
+.widget-slot > .glass.glow-cyan {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
