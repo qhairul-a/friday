@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { apiFetch } from "@/lib/api";
+import { useFinanceVisibility } from "@/lib/finance-visibility";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from "@dnd-kit/core";
@@ -361,6 +362,8 @@ export default function OverviewPage() {
   const sleepH = fitness?.sleep_duration_min ? Math.floor(fitness.sleep_duration_min / 60) : null;
   const sleepM = fitness?.sleep_duration_min ? fitness.sleep_duration_min % 60 : null;
 
+  const { visible: financeVisible } = useFinanceVisibility();
+
   const widgets: Record<string, React.ReactNode> = {
 
     fitness_snapshot: (
@@ -557,8 +560,10 @@ export default function OverviewPage() {
       <Widget title="◉ Last Expense" accent="var(--orange)">
         {lastExp ? (
           <div>
-            <div className="metric-value" style={{ color: "var(--orange)", marginBottom: 8 }}>
-              {(() => { const n = parseFloat(String(lastExp.amount ?? "").replace(/[$,]/g, "")); return isNaN(n) ? "SGD —" : `SGD ${n.toFixed(2)}`; })()}
+            <div className={`${financeVisible ? "" : "finance-hidden"} finance-blur`}>
+              <div className="metric-value" style={{ color: "var(--orange)", marginBottom: 8 }}>
+                {(() => { const n = parseFloat(String(lastExp.amount ?? "").replace(/[$,]/g, "")); return isNaN(n) ? "SGD —" : `SGD ${n.toFixed(2)}`; })()}
+              </div>
             </div>
             <div style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 4 }}>{lastExp.description}</div>
             <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-3)" }}>

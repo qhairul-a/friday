@@ -6,6 +6,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, LineChart, Line, Legend, LabelList,
 } from "recharts";
+import { useFinanceVisibility } from "@/lib/finance-visibility";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -379,6 +380,9 @@ export default function FinancePage() {
   const cur = summary?.currency ?? "SGD";
   const balance = income - (summary?.fixed_total ?? 0) - (summary?.variable_total ?? 0);
 
+  const { visible: financeVisible } = useFinanceVisibility();
+  const finHidden = financeVisible ? "" : "finance-hidden";
+
   // ── Widgets ──────────────────────────────────────────────────────────────────
 
   const widgets: Record<string, React.ReactNode> = {
@@ -390,8 +394,9 @@ export default function FinancePage() {
           <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="cyber-input"
             style={{ ...inputStyle, padding: "6px 10px", fontSize: 12, width: "auto" }} />
         </div>
+        <div className={finHidden}>
         {summary ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+          <div className="finance-blur" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
             {/* Income tile */}
             <div style={{ padding: "16px", background: "rgba(7,13,31,0.5)", borderRadius: 12, border: "1px solid var(--border)" }}>
               <div className="label" style={{ marginBottom: 8 }}>Income</div>
@@ -431,12 +436,14 @@ export default function FinancePage() {
             </div>
           </div>
         ) : <p style={{ color: "var(--text-3)", fontSize: 13 }}>Loading…</p>}
+        </div>
       </div>
     ),
 
     spending_breakdown: (
       <div className="glass" style={{ padding: "24px" }}>
         <div className="label-cyan" style={{ marginBottom: 16 }}>◉ Variable Expense Breakdown — {formatMonthFull(month)}</div>
+        <div className={`${finHidden} finance-blur`}>
         {pieData.length > 0 ? (
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
@@ -456,12 +463,14 @@ export default function FinancePage() {
             </PieChart>
           </ResponsiveContainer>
         ) : <p style={{ color: "var(--text-3)", fontSize: 13 }}>No variable expenses this month.</p>}
+        </div>
       </div>
     ),
 
     spending_trend: (
       <div className="glass" style={{ padding: "24px" }}>
         <div className="label-cyan" style={{ marginBottom: 16 }}>◈ Spending Trend — by Category</div>
+        <div className={`${finHidden} finance-blur`}>
         {trendData.length > 0 ? (
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={trendData}>
@@ -476,12 +485,14 @@ export default function FinancePage() {
             </LineChart>
           </ResponsiveContainer>
         ) : <p style={{ color: "var(--text-3)", fontSize: 13 }}>No data yet.</p>}
+        </div>
       </div>
     ),
 
     spending_frequency: (
       <div className="glass" style={{ padding: "24px" }}>
         <div className="label-cyan" style={{ marginBottom: 12 }}>⬡ Spending Frequency</div>
+        <div className={`${finHidden} finance-blur`}>
         {countData.length > 0 ? (
           <div style={{ display: "flex", gap: 16 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -512,12 +523,14 @@ export default function FinancePage() {
             </div>
           </div>
         ) : <p style={{ color: "var(--text-3)", fontSize: 13 }}>No data yet.</p>}
+        </div>
       </div>
     ),
 
     savings_trend: (
       <div className="glass" style={{ padding: "24px" }}>
         <div className="label-cyan" style={{ marginBottom: 12 }}>◑ Savings Trend</div>
+        <div className={`${finHidden} finance-blur`}>
         {savingsPieData.length > 0 || savingsBarData.length > 0 ? (
           <div style={{ display: "flex", gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -552,18 +565,20 @@ export default function FinancePage() {
             </div>
           </div>
         ) : <p style={{ color: "var(--text-3)", fontSize: 13 }}>No savings recorded yet.</p>}
+        </div>
       </div>
     ),
 
     savings: (
       <div className="glass" style={{ padding: "24px" }}>
         <div className="label-cyan" style={{ marginBottom: 16 }}>◈ Savings — {month}</div>
+        <div className={finHidden}>
         <div style={{ overflowX: "auto", maxHeight: 260, overflowY: "auto", marginBottom: 20 }}>
           <table className="data-table">
             <thead>
               <tr><th>Date</th><th>Category</th><th>Description</th><th style={{ textAlign: "right" }}>Amount</th><th /></tr>
             </thead>
-            <tbody>
+            <tbody className="finance-blur">
               {savings.length === 0 && (
                 <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>No savings this month.</td></tr>
               )}
@@ -597,6 +612,7 @@ export default function FinancePage() {
             </tbody>
           </table>
         </div>
+        </div>
         <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
           <div className="label" style={{ marginBottom: 10 }}>Add Saving</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -613,12 +629,13 @@ export default function FinancePage() {
     variable_expenses: (
       <div className="glass" style={{ padding: "24px" }}>
         <div className="label-cyan" style={{ marginBottom: 16 }}>⬡ Variable Expenses — {month}</div>
+        <div className={finHidden}>
         <div style={{ overflowX: "auto", maxHeight: 260, overflowY: "auto", marginBottom: 20 }}>
           <table className="data-table">
             <thead>
               <tr><th>Date</th><th>Category</th><th>Description</th><th style={{ textAlign: "right" }}>Amount</th><th /></tr>
             </thead>
-            <tbody>
+            <tbody className="finance-blur">
               {variable.length === 0 && (
                 <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>No expenses this month.</td></tr>
               )}
@@ -652,6 +669,7 @@ export default function FinancePage() {
             </tbody>
           </table>
         </div>
+        </div>
         <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
           <div className="label" style={{ marginBottom: 10 }}>Add Expense</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -668,12 +686,13 @@ export default function FinancePage() {
     fixed_expenses: (
       <div className="glass" style={{ padding: "24px" }}>
         <div className="label-cyan" style={{ marginBottom: 16 }}>◷ Fixed Expenses</div>
+        <div className={finHidden}>
         <div style={{ overflowX: "auto", maxHeight: 260, overflowY: "auto", marginBottom: 20 }}>
           <table className="data-table">
             <thead>
               <tr><th>Item</th><th style={{ textAlign: "right" }}>Cost/mo</th><th>Notes</th><th /></tr>
             </thead>
-            <tbody>
+            <tbody className="finance-blur">
               {fixed.length === 0 && (
                 <tr><td colSpan={4} style={{ textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>No fixed expenses.</td></tr>
               )}
@@ -704,6 +723,7 @@ export default function FinancePage() {
               ))}
             </tbody>
           </table>
+        </div>
         </div>
         <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
           <div className="label" style={{ marginBottom: 10 }}>Add Fixed Expense</div>

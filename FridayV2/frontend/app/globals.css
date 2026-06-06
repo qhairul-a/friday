@@ -322,3 +322,13 @@ select.cyber-input {
   min-height: 0;
   overflow: hidden;
 }
+
+/* ─── Finance privacy blur ──────────────────────────────────────────────────── */
+.finance-blur {
+  transition: filter 0.3s ease;
+}
+.finance-hidden .finance-blur {
+  filter: blur(8px);
+  user-select: none;
+  pointer-events: none;
+}
