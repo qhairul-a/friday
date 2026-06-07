@@ -137,6 +137,8 @@ export default function FitnessPage() {
   const [today, setToday] = useState<FitnessRow | null>(null);
   const [history, setHistory] = useState<FitnessRow[]>([]);
   const [syncing, setSyncing] = useState(false);
+  const [stepView,   setStepView]   = useState<"week" | "month">("week");
+  const [monthSteps, setMonthSteps] = useState<FitnessRow[]>([]);
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
   const [spans, setSpans] = useState<Record<string, number>>(DEFAULT_SPANS);
   const [heights, setHeights] = useState<Record<string, number>>(DEFAULT_HEIGHTS);
@@ -163,6 +165,15 @@ export default function FitnessPage() {
     setSyncing(true);
     try { await apiFetch("/fitness/sync", { method: "POST" }); await load(); } catch { /* ignore */ }
     setSyncing(false);
+  }
+
+  async function loadMonthSteps() {
+    const from = new Date(); from.setDate(from.getDate() - 29);
+    const { data } = await supabase.from("fitness_daily")
+      .select("date,steps")
+      .gte("date", from.toISOString().slice(0, 10))
+      .order("date", { ascending: true });
+    if (data) setMonthSteps(data as FitnessRow[]);
   }
 
   function getColWidth(): number {
@@ -242,6 +253,10 @@ export default function FitnessPage() {
     stress:     r.stress_avg,
   }));
 
+  const stepData = stepView === "week"
+    ? chartData.map(d => ({ date: d.date, steps: d.steps }))
+    : monthSteps.map(r => ({ date: r.date.slice(5), steps: r.steps }));
+
   const widgets: Record<string, React.ReactNode> = {
     metrics_grid: (
       <div className="glass" style={{ padding: "28px" }}>
@@ -267,7 +282,39 @@ export default function FitnessPage() {
         </div>
       </div>
     ),
-    steps_chart:   <ChartCard title="⬡ Steps — 7 days"             color="var(--cyan)"   data={chartData} dataKey="steps" />,
+    steps_chart: (
+      <div className="glass" style={{ padding: "24px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div className="label-cyan">⬡ Step Count</div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {(["week", "month"] as const).map(v => (
+              <button
+                key={v}
+                onClick={() => { setStepView(v); if (v === "month" && monthSteps.length === 0) loadMonthSteps(); }}
+                style={{
+                  padding: "3px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer",
+                  border: "1px solid",
+                  borderColor: stepView === v ? "var(--cyan)" : "rgba(255,255,255,0.15)",
+                  background:  stepView === v ? "rgba(34,211,238,0.15)" : "transparent",
+                  color:       stepView === v ? "var(--cyan)" : "var(--text-3)",
+                }}
+              >
+                {v === "week" ? "Week" : "Month"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={160}>
+          <BarChart data={stepData}>
+            <CartesianGrid strokeDasharray="2 6" stroke="rgba(34,211,238,0.06)" />
+            <XAxis dataKey="date" tick={{ fill: "var(--text-3)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: "var(--text-3)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} width={36} />
+            <Tooltip contentStyle={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 10, fontFamily: "var(--font-mono)", fontSize: 11 }} />
+            <Bar dataKey="steps" fill="var(--cyan)" opacity={0.8} radius={[2, 2, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    ),
     sleep_chart:   <ChartCard title="◑ Sleep — 7 days (hrs)"       color="var(--violet)" data={chartData} dataKey="sleep" />,
     hrv_chart:     <ChartCard title="♡ HRV — 7 days (ms)"          color="#34d399"       data={chartData} dataKey="hrv" />,
   };
