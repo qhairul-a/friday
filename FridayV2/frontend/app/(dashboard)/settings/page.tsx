@@ -115,21 +115,25 @@ export default function SettingsPage() {
           <div className="glass" style={{ padding: "24px", marginBottom: 28 }}>
             <div className="label-cyan" style={{ marginBottom: 14 }}>+ Add Fact Manually</div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <select
+              <input
+                list="memory-categories"
                 value={newFact.category}
-                onChange={(e) => setNewFact(p => ({ ...p, category: e.target.value }))}
+                onChange={e => setNewFact(p => ({ ...p, category: e.target.value }))}
                 style={{ ...inputStyle, width: 160 }}
                 className="cyber-input"
-              >
-                {CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
-              </select>
-              <input
+                placeholder="Category"
+              />
+              <datalist id="memory-categories">
+                {CATEGORIES.map(c => <option key={c} value={c} />)}
+              </datalist>
+              <textarea
                 value={newFact.fact}
-                onChange={(e) => setNewFact(p => ({ ...p, fact: e.target.value }))}
+                onChange={e => setNewFact(p => ({ ...p, fact: e.target.value }))}
                 placeholder="e.g. Prefers morning workouts before 8am"
-                style={{ ...inputStyle, flex: 1, minWidth: 200 }}
+                rows={3}
+                style={{ ...inputStyle, flex: 1, minWidth: 200, resize: "none", maxHeight: 140, overflowY: "auto" }}
                 className="cyber-input"
-                onKeyDown={(e) => e.key === "Enter" && addFact()}
+                onKeyDown={e => { if (e.key === "Enter" && e.ctrlKey) addFact(); }}
               />
               <button onClick={addFact} className="btn-primary" style={{ fontSize: 13, whiteSpace: "nowrap" }}>Add</button>
             </div>
@@ -157,12 +161,13 @@ export default function SettingsPage() {
                     <div style={{ width: 2, minHeight: 20, background: sourceColor(r.source), borderRadius: 2, flexShrink: 0, marginTop: 2 }} />
                     {editId === r.id ? (
                       <>
-                        <input
+                        <textarea
                           value={editFact}
-                          onChange={(e) => setEditFact(e.target.value)}
-                          style={{ ...inputStyle, flex: 1 }}
+                          onChange={e => setEditFact(e.target.value)}
+                          rows={3}
+                          style={{ ...inputStyle, flex: 1, resize: "none", maxHeight: 140, overflowY: "auto" }}
                           className="cyber-input"
-                          onKeyDown={(e) => e.key === "Enter" && saveEdit(r.id)}
+                          onKeyDown={e => { if (e.key === "Enter" && e.ctrlKey) saveEdit(r.id); }}
                           autoFocus
                         />
                         <button onClick={() => saveEdit(r.id)} style={{ color: "var(--cyan)", fontSize: 12, background: "none", border: "none", cursor: "pointer", whiteSpace: "nowrap" }}>Save</button>
