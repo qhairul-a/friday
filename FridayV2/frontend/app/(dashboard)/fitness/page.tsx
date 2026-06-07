@@ -321,7 +321,30 @@ export default function FitnessPage() {
         </ResponsiveContainer>
       </div>
     ),
-    sleep_chart:   <ChartCard title="◑ Sleep — 7 days (hrs)"       color="var(--violet)" data={chartData} dataKey="sleep" />,
+    sleep_chart: (
+      <div className="glass" style={{ padding: "24px" }}>
+        <div className="label-cyan" style={{ marginBottom: 16 }}>◑ Sleep Duration</div>
+        <ResponsiveContainer width="100%" height={160}>
+          <BarChart data={chartData}>
+            <CartesianGrid strokeDasharray="2 6" stroke="rgba(34,211,238,0.06)" />
+            <XAxis dataKey="date" tick={{ fill: "var(--text-3)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: "var(--text-3)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} width={36} tickFormatter={(v: number) => `${v}m`} />
+            <Tooltip contentStyle={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 10, fontFamily: "var(--font-mono)", fontSize: 11 }} />
+            <Bar dataKey="sleepDeep"  stackId="sleep" fill="#7c3aed" />
+            <Bar dataKey="sleepLight" stackId="sleep" fill="#a855f7" />
+            <Bar dataKey="sleepRem"   stackId="sleep" fill="#c084fc" radius={[2, 2, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+        <div style={{ display: "flex", gap: 14, marginTop: 10 }}>
+          {([["#7c3aed", "Deep"], ["#a855f7", "Light"], ["#c084fc", "REM"]] as const).map(([color, label]) => (
+            <span key={label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "var(--text-3)" }}>
+              <span style={{ width: 10, height: 10, background: color, borderRadius: 2, display: "inline-block" }} />
+              {label}
+            </span>
+          ))}
+        </div>
+      </div>
+    ),
     hrv_chart:     <ChartCard title="♡ HRV — 7 days (ms)"          color="#34d399"       data={chartData} dataKey="hrv" />,
   };
 
