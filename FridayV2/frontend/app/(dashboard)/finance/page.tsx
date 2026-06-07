@@ -428,6 +428,8 @@ export default function FinancePage() {
 
   const displayedVarData = searchResults ?? sortedVarData;
 
+  const sortedSavings = [...savings].sort((a, b) => b.date.localeCompare(a.date));
+
   const widgets: Record<string, React.ReactNode> = {
 
     summary: (
@@ -620,10 +622,10 @@ export default function FinancePage() {
               <tr><th>Date</th><th>Category</th><th>Description</th><th style={{ textAlign: "right" }}>Amount</th><th /></tr>
             </thead>
             <tbody className="finance-blur">
-              {savings.length === 0 && (
+              {sortedSavings.length === 0 && (
                 <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>No savings this month.</td></tr>
               )}
-              {savings.map((s) => (
+              {sortedSavings.map((s) => (
                 <tr key={s._index}>
                   {editSaving?._index === s._index ? (
                     <>
@@ -1018,8 +1020,8 @@ export default function FinancePage() {
               <table className="data-table" style={{ width: "100%" }}>
                 <thead><tr><th>Date</th><th>Category</th><th>Description</th><th style={{ textAlign: "right" }}>Amount</th><th /></tr></thead>
                 <tbody className="finance-blur">
-                  {savings.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>No savings this month.</td></tr>}
-                  {savings.map((s) => (
+                  {sortedSavings.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>No savings this month.</td></tr>}
+                  {sortedSavings.map((s) => (
                     <tr key={s._index}>
                       {editSaving?._index === s._index ? (
                         <>
