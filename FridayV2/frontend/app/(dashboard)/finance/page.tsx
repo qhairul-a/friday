@@ -1001,7 +1001,7 @@ export default function FinancePage() {
       {activeTab === "savings" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={metaRow}>
-            <span>{savings.length} entries · {cur} {savings.reduce((s, sv) => s + parseAmt(sv.amount), 0).toFixed(2)} — {formatMonthFull(month)}</span>
+            <span>{sortedSavings.length} entries · {cur} {sortedSavings.reduce((s, sv) => s + parseAmt(sv.amount), 0).toFixed(2)} — {formatMonthFull(month)}</span>
             <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="cyber-input"
               style={{ ...inputStyle, padding: "6px 10px", fontSize: 12, width: "auto" }} />
           </div>
