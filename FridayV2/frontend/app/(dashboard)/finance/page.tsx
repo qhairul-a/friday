@@ -152,12 +152,13 @@ const tooltipStyle = { background: "var(--bg-primary)", border: "1px solid var(-
 const gridStyle = { strokeDasharray: "2 6", stroke: "rgba(34,211,238,0.06)" };
 
 function SortableFixedRow({ id, children }: { id: number; children: React.ReactNode }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   return (
     <tr
       ref={setNodeRef}
       style={{
         transform: transform ? `translateY(${transform.y}px)` : undefined,
+        transition: transition ?? undefined,
         zIndex: isDragging ? 10 : undefined,
         position: isDragging ? "relative" : undefined,
         background: isDragging ? "var(--bg-elevated)" : undefined,
@@ -209,20 +210,22 @@ export default function FinancePage() {
   const [fixedOrder, setFixedOrder] = useState<number[]>([]);
 
   useEffect(() => {
-    const s  = localStorage.getItem(SPANS_KEY);
-    const ht = localStorage.getItem(HEIGHTS_KEY);
-    if (s)  setSpans(JSON.parse(s));
-    if (ht) setHeights(JSON.parse(ht));
-    const loaded: Partial<Record<TabId, string[]>> = {};
-    (Object.keys(TAB_LAYOUT_KEYS) as TabId[]).forEach(tab => {
-      const raw = localStorage.getItem(TAB_LAYOUT_KEYS[tab]);
-      if (raw) loaded[tab] = JSON.parse(raw);
-    });
-    if (Object.keys(loaded).length) setTabOrders(prev => ({ ...prev, ...loaded }));
-    const paid = localStorage.getItem("fixed_paid");
-    if (paid) setPaidFixed(new Set(JSON.parse(paid)));
-    const fo = localStorage.getItem("fixed_expense_order");
-    if (fo) setFixedOrder(JSON.parse(fo));
+    try {
+      const s  = localStorage.getItem(SPANS_KEY);
+      const ht = localStorage.getItem(HEIGHTS_KEY);
+      if (s)  setSpans(JSON.parse(s));
+      if (ht) setHeights(JSON.parse(ht));
+      const loaded: Partial<Record<TabId, string[]>> = {};
+      (Object.keys(TAB_LAYOUT_KEYS) as TabId[]).forEach(tab => {
+        const raw = localStorage.getItem(TAB_LAYOUT_KEYS[tab]);
+        if (raw) loaded[tab] = JSON.parse(raw);
+      });
+      if (Object.keys(loaded).length) setTabOrders(prev => ({ ...prev, ...loaded }));
+      const paid = localStorage.getItem("fixed_paid");
+      if (paid) setPaidFixed(new Set(JSON.parse(paid)));
+      const fo = localStorage.getItem("fixed_expense_order");
+      if (fo) setFixedOrder(JSON.parse(fo));
+    } catch { /* malformed stored value — ignore */ }
   }, []);
 
   const load = useCallback(async () => {
@@ -330,6 +333,7 @@ export default function FinancePage() {
     const currentOrder = orderedFixed.map(f => f._index);
     const oldIdx = currentOrder.indexOf(active.id as number);
     const newIdx = currentOrder.indexOf(over.id as number);
+    if (oldIdx === -1 || newIdx === -1) return;
     const next = arrayMove(currentOrder, oldIdx, newIdx);
     setFixedOrder(next);
     localStorage.setItem("fixed_expense_order", JSON.stringify(next));
