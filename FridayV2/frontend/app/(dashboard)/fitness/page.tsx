@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { apiFetch } from "@/lib/api";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -233,11 +233,13 @@ export default function FitnessPage() {
   const sleepM = today?.sleep_duration_min ? today.sleep_duration_min % 60 : null;
 
   const chartData = history.map(r => ({
-    date: r.date.slice(5),
-    steps: r.steps,
-    sleep: r.sleep_duration_min ? Math.round(r.sleep_duration_min / 6) / 10 : null,
-    hrv: r.hrv_score,
-    battery: r.body_battery_high,
+    date:       r.date.slice(5),
+    steps:      r.steps,
+    sleepDeep:  r.sleep_deep_min,
+    sleepLight: r.sleep_light_min,
+    sleepRem:   r.sleep_rem_min,
+    resting_hr: r.resting_hr,
+    stress:     r.stress_avg,
   }));
 
   const widgets: Record<string, React.ReactNode> = {
