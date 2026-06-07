@@ -12,21 +12,19 @@ const LAYOUT_KEY  = "layout_fitness";
 const SPANS_KEY   = "spans_fitness";
 const NUM_COLS    = 2;
 const GRID_GAP    = 20;
-const DEFAULT_ORDER = ["metrics_grid", "steps_chart", "sleep_chart", "hrv_chart", "battery_chart", "history_table"];
-const DEFAULT_SPANS: Record<string, number> = { metrics_grid: 2, steps_chart: 2, sleep_chart: 1, hrv_chart: 1, battery_chart: 1, history_table: 2 };
+const DEFAULT_ORDER = ["metrics_grid", "steps_chart", "sleep_chart", "hrv_chart", "stress_chart"];
+const DEFAULT_SPANS: Record<string, number> = { metrics_grid: 2, steps_chart: 2, sleep_chart: 1, hrv_chart: 1, stress_chart: 2 };
 
-const HEIGHTS_KEY   = "heights_fitness";
-const ROW_HEIGHT    = 220;
-const MIN_ROWS      = 1;
-const MAX_ROWS      = 6;
+const HEIGHTS_KEY   = "heights_fitness_px";
+const MIN_HEIGHT    = 120;
+const MAX_HEIGHT    = 1400;
 
 const DEFAULT_HEIGHTS: Record<string, number> = {
-  metrics_grid:  1,
-  steps_chart:   2,
-  sleep_chart:   2,
-  hrv_chart:     2,
-  battery_chart: 2,
-  history_table: 3,
+  metrics_grid: 220,
+  steps_chart:  440,
+  sleep_chart:  440,
+  hrv_chart:    440,
+  stress_chart: 440,
 };
 
 interface FitnessRow {
@@ -51,7 +49,8 @@ function SortableWidget({ id, span = 1, height = 1, onResizeStart, onHeightResiz
         transform: CSS.Transform.toString(transform), transition,
         position: "relative",
         gridColumn: `span ${span}`,
-        gridRow: `span ${height}`,
+        height: `${height}px`,
+        alignSelf: "start",
         display: "flex",
         flexDirection: "column",
       }}
@@ -211,8 +210,7 @@ export default function FitnessPage() {
     const startY      = e.clientY;
     const startHeight = heights[id] ?? DEFAULT_HEIGHTS[id] ?? 1;
     function onMove(mv: MouseEvent) {
-      const delta = Math.round((mv.clientY - startY) / (ROW_HEIGHT + GRID_GAP));
-      handleHeightChange(id, Math.max(MIN_ROWS, Math.min(MAX_ROWS, startHeight + delta)));
+      handleHeightChange(id, Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, startHeight + (mv.clientY - startY))));
     }
     function onUp() {
       window.removeEventListener("mousemove", onMove);
@@ -270,29 +268,6 @@ export default function FitnessPage() {
     steps_chart:   <ChartCard title="⬡ Steps — 7 days"             color="var(--cyan)"   data={chartData} dataKey="steps" />,
     sleep_chart:   <ChartCard title="◑ Sleep — 7 days (hrs)"       color="var(--violet)" data={chartData} dataKey="sleep" />,
     hrv_chart:     <ChartCard title="♡ HRV — 7 days (ms)"          color="#34d399"       data={chartData} dataKey="hrv" />,
-    battery_chart: <ChartCard title="◉ Body Battery Peak — 7 days" color="var(--orange)" data={chartData} dataKey="battery" />,
-    history_table: (
-      <div className="glass" style={{ padding: "24px" }}>
-        <div className="label-cyan" style={{ marginBottom: 16 }}>◈ 7-day History</div>
-        <div style={{ overflowX: "auto" }}>
-          <table className="data-table">
-            <thead><tr><th>Date</th><th>Steps</th><th>Sleep</th><th>HRV</th><th>Battery</th><th>Stress</th></tr></thead>
-            <tbody>
-              {history.map(r => (
-                <tr key={r.date}>
-                  <td style={{ fontFamily: "var(--font-mono)", color: "var(--text-3)" }}>{r.date}</td>
-                  <td style={{ textAlign: "right" }}>{r.steps?.toLocaleString() ?? "—"}</td>
-                  <td style={{ textAlign: "right" }}>{r.sleep_duration_min ? `${Math.floor(r.sleep_duration_min/60)}h${r.sleep_duration_min%60}m` : "—"}</td>
-                  <td style={{ textAlign: "right", color: "var(--cyan)" }}>{r.hrv_score ?? "—"}</td>
-                  <td style={{ textAlign: "right", color: "var(--orange)" }}>{r.body_battery_high ?? "—"}</td>
-                  <td style={{ textAlign: "right" }}>{r.stress_avg ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    ),
   };
 
   return (
@@ -309,7 +284,7 @@ export default function FitnessPage() {
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={order} strategy={rectSortingStrategy}>
-          <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, gridAutoRows: `${ROW_HEIGHT}px` }}>
+          <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>
             {order.map(id => (
               <SortableWidget
                 key={id}
