@@ -69,10 +69,7 @@ def fetch_income() -> float:
     NOTE: if the tab name is not 'Sheet2', update the range string below.
     """
     raw = read_cell(INCOME_SPREADSHEET_ID, "Sheet2!B1")
-    try:
-        return float(str(raw).replace(",", "").strip())
-    except (ValueError, TypeError):
-        return 0.0
+    return _parse_amount(raw)
 
 
 def _find_fixed(query: str) -> list[tuple[int, dict]]:
