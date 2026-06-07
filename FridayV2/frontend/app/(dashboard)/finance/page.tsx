@@ -8,7 +8,7 @@ import {
 } from "recharts";
 import { useFinanceVisibility } from "@/lib/finance-visibility";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
-import { SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import { SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 const SPANS_KEY   = "spans_finance";
@@ -151,6 +151,31 @@ const axisStyle = { fill: "var(--text-3)", fontSize: 10, fontFamily: "var(--font
 const tooltipStyle = { background: "var(--bg-primary)", border: "1px solid var(--border)", borderRadius: 10, fontFamily: "var(--font-mono)", fontSize: 11 };
 const gridStyle = { strokeDasharray: "2 6", stroke: "rgba(34,211,238,0.06)" };
 
+function SortableFixedRow({ id, children }: { id: number; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useSortable({ id });
+  return (
+    <tr
+      ref={setNodeRef}
+      style={{
+        transform: transform ? `translateY(${transform.y}px)` : undefined,
+        zIndex: isDragging ? 10 : undefined,
+        position: isDragging ? "relative" : undefined,
+        background: isDragging ? "var(--bg-elevated)" : undefined,
+        opacity: isDragging ? 0.9 : 1,
+      }}
+    >
+      <td style={{ paddingRight: 4, width: 20 }}>
+        <span
+          {...attributes}
+          {...listeners}
+          style={{ cursor: "grab", color: "var(--text-3)", fontSize: 14, userSelect: "none" }}
+        >⠿</span>
+      </td>
+      {children}
+    </tr>
+  );
+}
+
 export default function FinancePage() {
   const [activeTab, setActiveTab]     = useState<TabId>("overview");
   const [tabOrders, setTabOrders]     = useState<Record<TabId, string[]>>({
@@ -181,6 +206,7 @@ export default function FinancePage() {
   const [paidFixed, setPaidFixed] = useState<Set<number>>(new Set());
   const [editSaving, setEditSaving] = useState<Saving | null>(null);
   const [varSearch, setVarSearch] = useState("");
+  const [fixedOrder, setFixedOrder] = useState<number[]>([]);
 
   useEffect(() => {
     const s  = localStorage.getItem(SPANS_KEY);
@@ -195,6 +221,8 @@ export default function FinancePage() {
     if (Object.keys(loaded).length) setTabOrders(prev => ({ ...prev, ...loaded }));
     const paid = localStorage.getItem("fixed_paid");
     if (paid) setPaidFixed(new Set(JSON.parse(paid)));
+    const fo = localStorage.getItem("fixed_expense_order");
+    if (fo) setFixedOrder(JSON.parse(fo));
   }, []);
 
   const load = useCallback(async () => {
@@ -294,6 +322,17 @@ export default function FinancePage() {
       setTabOrders(prev => ({ ...prev, [activeTab]: next }));
       localStorage.setItem(TAB_LAYOUT_KEYS[activeTab], JSON.stringify(next));
     }
+  }
+
+  function onFixedDragEnd(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const currentOrder = orderedFixed.map(f => f._index);
+    const oldIdx = currentOrder.indexOf(active.id as number);
+    const newIdx = currentOrder.indexOf(over.id as number);
+    const next = arrayMove(currentOrder, oldIdx, newIdx);
+    setFixedOrder(next);
+    localStorage.setItem("fixed_expense_order", JSON.stringify(next));
   }
 
   async function addFixed() {
@@ -429,6 +468,15 @@ export default function FinancePage() {
   const displayedVarData = searchResults ?? sortedVarData;
 
   const sortedSavings = [...savings].sort((a, b) => b.date.localeCompare(a.date));
+
+  const orderedFixed: FixedExpense[] = fixedOrder.length
+    ? [
+        ...fixedOrder
+          .map(idx => fixed.find(f => f._index === idx))
+          .filter((f): f is FixedExpense => f !== undefined),
+        ...fixed.filter(f => !fixedOrder.includes(f._index)),
+      ]
+    : fixed;
 
   const widgets: Record<string, React.ReactNode> = {
 
@@ -873,43 +921,58 @@ export default function FinancePage() {
           </div>
           <div style={{ ...panel, overflow: "hidden" }}>
             <div className={finHidden} style={{ overflowX: "auto" }}>
-              <table className="data-table" style={{ width: "100%" }}>
-                <thead><tr><th style={{ width: 32 }} /><th>Item</th><th style={{ textAlign: "right" }}>Cost/mo</th><th>Notes</th><th /></tr></thead>
-                <tbody className="finance-blur">
-                  {fixed.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>No fixed expenses.</td></tr>}
-                  {fixed.map((f) => {
-                    const isPaid = paidFixed.has(f._index);
-                    return (
-                      <tr key={f._index} style={{ opacity: isPaid ? 0.45 : 1, transition: "opacity 0.2s" }}>
-                        <td style={{ paddingRight: 4 }}>
-                          <input type="checkbox" checked={isPaid} onChange={() => togglePaidFixed(f._index)} style={{ accentColor: "var(--cyan)", width: 14, height: 14, cursor: "pointer" }} />
-                        </td>
-                        {editFixed?._index === f._index ? (
-                          <>
-                            <td><input value={editFixed.item} onChange={e => setEditFixed(p => p && { ...p, item: e.target.value })} style={{ ...inputStyle, width: "100%", padding: "4px 8px", fontSize: 12 }} /></td>
-                            <td><input value={editFixed.cost} onChange={e => setEditFixed(p => p && { ...p, cost: e.target.value })} style={{ ...inputStyle, width: 80, padding: "4px 8px", fontSize: 12, textAlign: "right" }} /></td>
-                            <td><input value={editFixed.comments} onChange={e => setEditFixed(p => p && { ...p, comments: e.target.value })} style={{ ...inputStyle, width: "100%", padding: "4px 8px", fontSize: 12 }} /></td>
-                            <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                              <button onClick={saveEditFixed} style={{ color: "var(--cyan)", fontSize: 11, background: "none", border: "none", cursor: "pointer", marginRight: 6 }}>Save</button>
-                              <button onClick={() => setEditFixed(null)} style={{ color: "var(--text-3)", fontSize: 11, background: "none", border: "none", cursor: "pointer" }}>Cancel</button>
-                            </td>
-                          </>
-                        ) : (
-                          <>
-                            <td style={{ textDecoration: isPaid ? "line-through" : "none" }}>{f.item}</td>
-                            <td style={{ textAlign: "right", color: isPaid ? "var(--text-3)" : "var(--cyan)", fontFamily: "var(--font-mono)", textDecoration: isPaid ? "line-through" : "none" }}>{parseFloat(f.cost).toFixed(2)}</td>
-                            <td style={{ color: "var(--text-3)", fontSize: 12 }}>{f.comments}</td>
-                            <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                              <button onClick={() => setEditFixed({ ...f })} className="btn-icon" style={{ fontSize: 11, marginRight: 4 }}>✎</button>
-                              <button onClick={() => deleteFixed(f._index)} className="btn-danger">✕</button>
-                            </td>
-                          </>
-                        )}
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onFixedDragEnd}>
+                <SortableContext items={orderedFixed.map(f => f._index)} strategy={verticalListSortingStrategy}>
+                  <table className="data-table" style={{ width: "100%" }}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: 20 }} />
+                        <th style={{ width: 32 }} />
+                        <th>Item</th>
+                        <th style={{ textAlign: "right" }}>Cost/mo</th>
+                        <th>Notes</th>
+                        <th />
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody className="finance-blur">
+                      {orderedFixed.length === 0 && (
+                        <tr><td colSpan={6} style={{ textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>No fixed expenses.</td></tr>
+                      )}
+                      {orderedFixed.map((f) => {
+                        const isPaid = paidFixed.has(f._index);
+                        return (
+                          <SortableFixedRow key={f._index} id={f._index}>
+                            <td style={{ paddingRight: 4, opacity: isPaid ? 0.45 : 1, transition: "opacity 0.2s" }}>
+                              <input type="checkbox" checked={isPaid} onChange={() => togglePaidFixed(f._index)} style={{ accentColor: "var(--cyan)", width: 14, height: 14, cursor: "pointer" }} />
+                            </td>
+                            {editFixed?._index === f._index ? (
+                              <>
+                                <td><input value={editFixed.item} onChange={e => setEditFixed(p => p && { ...p, item: e.target.value })} style={{ ...inputStyle, width: "100%", padding: "4px 8px", fontSize: 12 }} /></td>
+                                <td><input value={editFixed.cost} onChange={e => setEditFixed(p => p && { ...p, cost: e.target.value })} style={{ ...inputStyle, width: 80, padding: "4px 8px", fontSize: 12, textAlign: "right" }} /></td>
+                                <td><input value={editFixed.comments} onChange={e => setEditFixed(p => p && { ...p, comments: e.target.value })} style={{ ...inputStyle, width: "100%", padding: "4px 8px", fontSize: 12 }} /></td>
+                                <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                                  <button onClick={saveEditFixed} style={{ color: "var(--cyan)", fontSize: 11, background: "none", border: "none", cursor: "pointer", marginRight: 6 }}>Save</button>
+                                  <button onClick={() => setEditFixed(null)} style={{ color: "var(--text-3)", fontSize: 11, background: "none", border: "none", cursor: "pointer" }}>Cancel</button>
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td style={{ textDecoration: isPaid ? "line-through" : "none", opacity: isPaid ? 0.45 : 1, transition: "opacity 0.2s" }}>{f.item}</td>
+                                <td style={{ textAlign: "right", color: isPaid ? "var(--text-3)" : "var(--cyan)", fontFamily: "var(--font-mono)", textDecoration: isPaid ? "line-through" : "none", opacity: isPaid ? 0.45 : 1, transition: "opacity 0.2s" }}>{parseFloat(f.cost).toFixed(2)}</td>
+                                <td style={{ color: "var(--text-3)", fontSize: 12, opacity: isPaid ? 0.45 : 1, transition: "opacity 0.2s" }}>{f.comments}</td>
+                                <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                                  <button onClick={() => setEditFixed({ ...f })} className="btn-icon" style={{ fontSize: 11, marginRight: 4 }}>✎</button>
+                                  <button onClick={() => deleteFixed(f._index)} className="btn-danger">✕</button>
+                                </td>
+                              </>
+                            )}
+                          </SortableFixedRow>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </SortableContext>
+              </DndContext>
             </div>
           </div>
         </div>
