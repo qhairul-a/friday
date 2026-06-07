@@ -169,11 +169,16 @@ export default function FitnessPage() {
 
   async function loadMonthSteps() {
     const from = new Date(); from.setDate(from.getDate() - 29);
-    const { data } = await supabase.from("fitness_daily")
-      .select("date,steps")
-      .gte("date", from.toISOString().slice(0, 10))
-      .order("date", { ascending: true });
-    if (data) setMonthSteps(data as FitnessRow[]);
+    try {
+      const { data, error } = await supabase.from("fitness_daily")
+        .select("date,steps")
+        .gte("date", from.toISOString().slice(0, 10))
+        .order("date", { ascending: true });
+      if (error) throw error;
+      if (data) setMonthSteps(data as FitnessRow[]);
+    } catch (err) {
+      console.error("loadMonthSteps failed:", err);
+    }
   }
 
   function getColWidth(): number {
@@ -297,6 +302,7 @@ export default function FitnessPage() {
                   borderColor: stepView === v ? "var(--cyan)" : "rgba(255,255,255,0.15)",
                   background:  stepView === v ? "rgba(34,211,238,0.15)" : "transparent",
                   color:       stepView === v ? "var(--cyan)" : "var(--text-3)",
+                  transition:  "all 0.15s",
                 }}
               >
                 {v === "week" ? "Week" : "Month"}
