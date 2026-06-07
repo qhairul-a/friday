@@ -87,7 +87,6 @@ def get_daily_summary(date: str | None = None) -> str:
     if not row:
         return f"No fitness data found for {target}. Make sure your Garmin watch has synced."
 
-    cur = settings.CURRENCY
     lines = [f"Health summary for {target}:"]
 
     if row.get("steps") is not None:

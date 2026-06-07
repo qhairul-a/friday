@@ -6,7 +6,7 @@ doesn't break a full sync.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from garminconnect import Garmin, GarminConnectAuthenticationError

@@ -116,29 +116,13 @@ function MetricTile({ label, value, unit = "", accent = "var(--cyan)" }: { label
   );
 }
 
-function ChartCard({ title, color, data, dataKey }: { title: string; color: string; data: object[]; dataKey: string }) {
-  return (
-    <div className="glass" style={{ padding: "24px" }}>
-      <div className="label-cyan" style={{ marginBottom: 16 }}>{title}</div>
-      <ResponsiveContainer width="100%" height={160}>
-        <LineChart data={data}>
-          <CartesianGrid strokeDasharray="2 6" stroke="rgba(34,211,238,0.06)" />
-          <XAxis dataKey="date" tick={{ fill: "var(--text-3)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fill: "var(--text-3)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} width={36} />
-          <Tooltip contentStyle={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 10, fontFamily: "var(--font-mono)", fontSize: 11 }} />
-          <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: color }} />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
 export default function FitnessPage() {
   const [today, setToday] = useState<FitnessRow | null>(null);
   const [history, setHistory] = useState<FitnessRow[]>([]);
   const [syncing, setSyncing] = useState(false);
-  const [stepView,   setStepView]   = useState<"week" | "month">("week");
-  const [monthSteps, setMonthSteps] = useState<FitnessRow[]>([]);
+  const [stepView,    setStepView]    = useState<"week" | "month">("week");
+  const [monthSteps,  setMonthSteps]  = useState<FitnessRow[]>([]);
+  const [monthLoading, setMonthLoading] = useState(false);
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
   const [spans, setSpans] = useState<Record<string, number>>(DEFAULT_SPANS);
   const [heights, setHeights] = useState<Record<string, number>>(DEFAULT_HEIGHTS);
@@ -168,6 +152,7 @@ export default function FitnessPage() {
   }
 
   async function loadMonthSteps() {
+    setMonthLoading(true);
     const from = new Date(); from.setDate(from.getDate() - 29);
     try {
       const { data, error } = await supabase.from("fitness_daily")
@@ -178,6 +163,8 @@ export default function FitnessPage() {
       if (data) setMonthSteps(data as FitnessRow[]);
     } catch (err) {
       console.error("loadMonthSteps failed:", err);
+    } finally {
+      setMonthLoading(false);
     }
   }
 
@@ -313,7 +300,7 @@ export default function FitnessPage() {
                   transition:  "all 0.15s",
                 }}
               >
-                {v === "week" ? "Week" : "Month"}
+                {v === "week" ? "Week" : monthLoading ? "Loading…" : "Month"}
               </button>
             ))}
           </div>
