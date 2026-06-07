@@ -266,6 +266,10 @@ export default function FitnessPage() {
     ? Math.round(chartData.reduce((s, d) => s + (d.resting_hr ?? 0), 0) / chartData.filter(d => d.resting_hr != null).length)
     : null;
 
+  const stressAvg = chartData.filter(d => d.stress != null).length
+    ? Math.round(chartData.reduce((s, d) => s + (d.stress ?? 0), 0) / chartData.filter(d => d.stress != null).length)
+    : null;
+
   const widgets: Record<string, React.ReactNode> = {
     metrics_grid: (
       <div className="glass" style={{ padding: "28px" }}>
@@ -363,6 +367,24 @@ export default function FitnessPage() {
                 label={{ value: "avg", position: "insideTopRight", fill: "rgba(248,113,113,0.6)", fontSize: 8 }} />
             )}
             <Line type="monotone" dataKey="resting_hr" stroke="#f87171" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#f87171" }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    ),
+    stress_chart: (
+      <div className="glass" style={{ padding: "24px" }}>
+        <div className="label-cyan" style={{ marginBottom: 16 }}>◎ Stress Average</div>
+        <ResponsiveContainer width="100%" height={160}>
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="2 6" stroke="rgba(34,211,238,0.06)" />
+            <XAxis dataKey="date" tick={{ fill: "var(--text-3)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: "var(--text-3)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} width={36} />
+            <Tooltip contentStyle={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 10, fontFamily: "var(--font-mono)", fontSize: 11 }} />
+            {stressAvg !== null && (
+              <ReferenceLine y={stressAvg} stroke="rgba(251,146,60,0.4)" strokeDasharray="4 4"
+                label={{ value: "avg", position: "insideTopRight", fill: "rgba(251,146,60,0.6)", fontSize: 8 }} />
+            )}
+            <Line type="monotone" dataKey="stress" stroke="#fb923c" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#fb923c" }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
