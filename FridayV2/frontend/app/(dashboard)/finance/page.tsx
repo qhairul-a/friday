@@ -180,6 +180,7 @@ export default function FinancePage() {
   const [editVar, setEditVar]     = useState<VarExpense | null>(null);
   const [paidFixed, setPaidFixed] = useState<Set<number>>(new Set());
   const [editSaving, setEditSaving] = useState<Saving | null>(null);
+  const [varSearch, setVarSearch] = useState("");
 
   useEffect(() => {
     const s  = localStorage.getItem(SPANS_KEY);
@@ -414,6 +415,18 @@ export default function FinancePage() {
 
   const sortedVarData = [...varMonthData].sort((a, b) => b.date.localeCompare(a.date));
   const todayYM = new Date().toISOString().slice(0, 7);
+
+  const searchResults = varSearch.trim()
+    ? allVariable
+        .filter(v =>
+          [v.description, v.category].some(f =>
+            f.toLowerCase().includes(varSearch.toLowerCase())
+          )
+        )
+        .sort((a, b) => b.date.localeCompare(a.date))
+    : null;
+
+  const displayedVarData = searchResults ?? sortedVarData;
 
   const widgets: Record<string, React.ReactNode> = {
 
@@ -904,16 +917,32 @@ export default function FinancePage() {
       {activeTab === "variable" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={metaRow}>
-            <span>{sortedVarData.length} entries · {cur} {sortedVarData.reduce((s, v) => s + parseAmt(v.amount), 0).toFixed(2)} — {formatMonthFull(varMonth)}</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-              <button onClick={() => shiftVarMonth(-1)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-2)", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "2px 8px", transition: "border-color 0.15s, color 0.15s" }}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--cyan)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--cyan)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--text-2)"; }}
-              >‹</button>
-              <button onClick={() => shiftVarMonth(1)} disabled={varMonth >= todayYM} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, color: varMonth >= todayYM ? "var(--text-3)" : "var(--text-2)", cursor: varMonth >= todayYM ? "not-allowed" : "pointer", fontSize: 16, lineHeight: 1, padding: "2px 8px", opacity: varMonth >= todayYM ? 0.4 : 1, transition: "border-color 0.15s, color 0.15s" }}
-                onMouseEnter={e => { if (varMonth < todayYM) { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--cyan)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--cyan)"; } }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLButtonElement).style.color = varMonth >= todayYM ? "var(--text-3)" : "var(--text-2)"; }}
-              >›</button>
+            <span>
+              {searchResults
+                ? `${searchResults.length} results · ${cur} ${searchResults.reduce((s, v) => s + parseAmt(v.amount), 0).toFixed(2)} — all months`
+                : `${sortedVarData.length} entries · ${cur} ${sortedVarData.reduce((s, v) => s + parseAmt(v.amount), 0).toFixed(2)} — ${formatMonthFull(varMonth)}`
+              }
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                value={varSearch}
+                onChange={e => setVarSearch(e.target.value)}
+                placeholder="Search expenses…"
+                style={{ ...inputStyle, padding: "5px 10px", fontSize: 12, width: 180 }}
+                className="cyber-input"
+              />
+              {!searchResults && (
+                <>
+                  <button onClick={() => shiftVarMonth(-1)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-2)", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "2px 8px", transition: "border-color 0.15s, color 0.15s" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--cyan)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--cyan)"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--text-2)"; }}
+                  >‹</button>
+                  <button onClick={() => shiftVarMonth(1)} disabled={varMonth >= todayYM} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, color: varMonth >= todayYM ? "var(--text-3)" : "var(--text-2)", cursor: varMonth >= todayYM ? "not-allowed" : "pointer", fontSize: 16, lineHeight: 1, padding: "2px 8px", opacity: varMonth >= todayYM ? 0.4 : 1, transition: "border-color 0.15s, color 0.15s" }}
+                    onMouseEnter={e => { if (varMonth < todayYM) { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--cyan)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--cyan)"; } }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLButtonElement).style.color = varMonth >= todayYM ? "var(--text-3)" : "var(--text-2)"; }}
+                  >›</button>
+                </>
+              )}
             </div>
           </div>
           <div style={{ ...panel, padding: "20px 24px" }}>
@@ -931,8 +960,8 @@ export default function FinancePage() {
               <table className="data-table" style={{ width: "100%" }}>
                 <thead><tr><th>Date</th><th>Category</th><th>Description</th><th style={{ textAlign: "right" }}>Amount</th><th /></tr></thead>
                 <tbody className="finance-blur">
-                  {sortedVarData.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>No expenses this month.</td></tr>}
-                  {sortedVarData.map((v) => (
+                  {displayedVarData.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>No expenses found.</td></tr>}
+                  {displayedVarData.map((v) => (
                     <tr key={v._index}>
                       {editVar?._index === v._index ? (
                         <>
