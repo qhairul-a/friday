@@ -21,6 +21,13 @@ const inputStyle: React.CSSProperties = {
   padding: "9px 13px", outline: "none", transition: "border-color 0.2s",
 };
 
+function sourceColor(source: string): string {
+  if (source === "friday") return "var(--violet)";
+  if (source === "stated") return "var(--cyan)";
+  if (source === "manual") return "var(--orange)";
+  return "var(--text-3)";
+}
+
 export default function SettingsPage() {
   const [tab, setTab]         = useState<Tab>("memory");
   const [memory, setMemory]   = useState<MemoryRow[]>([]);
@@ -52,7 +59,7 @@ export default function SettingsPage() {
   }
   async function addFact() {
     if (!newFact.fact.trim()) return;
-    await supabase.from("user_memory").insert({ category: newFact.category, fact: newFact.fact, source: "stated" });
+    await supabase.from("user_memory").insert({ category: newFact.category, fact: newFact.fact, source: "manual" });
     setNewFact(p => ({ ...p, fact: "" }));
     loadMemory();
   }
@@ -142,12 +149,12 @@ export default function SettingsPage() {
 
           {Object.entries(byCategory).sort().map(([cat, facts]) => (
             <div key={cat} style={{ marginBottom: 28 }}>
-              <div className="label" style={{ marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>{cat}</div>
+              <div className="label" style={{ marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>📁 {cat}</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {facts.map(r => (
                   <div key={r.id} className="glass" style={{ padding: "14px 18px", display: "flex", alignItems: "flex-start", gap: 12 }}>
                     {/* Left accent */}
-                    <div style={{ width: 2, minHeight: 20, background: "var(--violet)", borderRadius: 2, flexShrink: 0, marginTop: 2 }} />
+                    <div style={{ width: 2, minHeight: 20, background: sourceColor(r.source), borderRadius: 2, flexShrink: 0, marginTop: 2 }} />
                     {editId === r.id ? (
                       <>
                         <input
