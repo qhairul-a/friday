@@ -312,7 +312,7 @@ import json as _json
 from pathlib import Path as _Path
 
 from integrations.gsheets import get_all_rows, append_row, update_row, delete_row
-from integrations.finance import _fixed_id, _variable_id, _savings_id, _parse_amount, _current_month
+from integrations.finance import _fixed_id, _variable_id, _savings_id, _parse_amount, _current_month, fetch_income
 
 _FINANCE_CONFIG = _Path(__file__).parent / "data" / "finance_config.json"
 
@@ -463,26 +463,10 @@ def get_finance_summary(month: Optional[str] = None):
 
 @app.get("/finance/income")
 def get_income():
-    import re as _re
-    cfg = _read_finance_config()
-    stored = float(cfg.get("monthly_income", 0.0))
-    if stored > 0:
-        return {"amount": stored}
-    # Fallback: read income/salary facts from Friday's memory
     try:
-        rows = get_supabase().table("user_memory").select("fact").execute()
-        keywords = ["income", "salary", "earns", "earn", "wage", "pay"]
-        for row in (rows.data or []):
-            fact = (row.get("fact") or "").lower()
-            if any(kw in fact for kw in keywords):
-                nums = _re.findall(r'[\d,]+(?:\.\d+)?', fact)
-                for n in nums:
-                    val = float(n.replace(",", ""))
-                    if val >= 500:
-                        return {"amount": val}
-    except Exception:
-        pass
-    return {"amount": 0.0}
+        return {"amount": fetch_income()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 class IncomeBody(BaseModel):
