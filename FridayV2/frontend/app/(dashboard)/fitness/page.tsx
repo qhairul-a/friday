@@ -262,6 +262,10 @@ export default function FitnessPage() {
     ? chartData.map(d => ({ date: d.date, steps: d.steps }))
     : monthSteps.map(r => ({ date: r.date.slice(5), steps: r.steps }));
 
+  const hrAvg = chartData.filter(d => d.resting_hr != null).length
+    ? Math.round(chartData.reduce((s, d) => s + (d.resting_hr ?? 0), 0) / chartData.filter(d => d.resting_hr != null).length)
+    : null;
+
   const widgets: Record<string, React.ReactNode> = {
     metrics_grid: (
       <div className="glass" style={{ padding: "28px" }}>
@@ -345,7 +349,24 @@ export default function FitnessPage() {
         </div>
       </div>
     ),
-    hrv_chart:     <ChartCard title="♡ HRV — 7 days (ms)"          color="#34d399"       data={chartData} dataKey="hrv" />,
+    hrv_chart: (
+      <div className="glass" style={{ padding: "24px" }}>
+        <div className="label-cyan" style={{ marginBottom: 16 }}>♡ Heart Rate</div>
+        <ResponsiveContainer width="100%" height={160}>
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="2 6" stroke="rgba(34,211,238,0.06)" />
+            <XAxis dataKey="date" tick={{ fill: "var(--text-3)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: "var(--text-3)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} width={36} />
+            <Tooltip contentStyle={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 10, fontFamily: "var(--font-mono)", fontSize: 11 }} />
+            {hrAvg !== null && (
+              <ReferenceLine y={hrAvg} stroke="rgba(248,113,113,0.4)" strokeDasharray="4 4"
+                label={{ value: "avg", position: "insideTopRight", fill: "rgba(248,113,113,0.6)", fontSize: 8 }} />
+            )}
+            <Line type="monotone" dataKey="resting_hr" stroke="#f87171" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#f87171" }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    ),
   };
 
   return (
