@@ -92,7 +92,7 @@ def fetch_hrv(date: str) -> dict:
     summary = raw.get("hrvSummary", {})
     logger.debug("fetch_hrv summary=%s", summary)
     return {
-        "hrv_score": summary.get("lastNight"),
+        "hrv_score": summary.get("lastNightAvg") or summary.get("lastNight"),
         "hrv_status": summary.get("status"),
     }
 
@@ -132,7 +132,7 @@ def fetch_resting_hr(date: str) -> dict:
     value = raw.get("allMetrics", {}).get("metricsMap", {}).get("WELLNESS_RESTING_HEART_RATE", [{}])
     logger.debug("fetch_resting_hr WELLNESS_RESTING_HEART_RATE value=%s", value)
     if isinstance(value, list) and value:
-        return {"resting_hr": value[0].get("metricValue")}
+        return {"resting_hr": value[0].get("value")}
     return {}
 
 
