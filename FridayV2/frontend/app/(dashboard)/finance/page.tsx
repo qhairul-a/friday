@@ -419,7 +419,7 @@ export default function FinancePage() {
   const searchResults = varSearch.trim()
     ? allVariable
         .filter(v =>
-          [v.description, v.category].some(f =>
+          [v.description || "", v.category || ""].some(f =>
             f.toLowerCase().includes(varSearch.toLowerCase())
           )
         )
