@@ -17,12 +17,11 @@ const LAYOUT_KEY = "layout_overview_v2";
 const HIDDEN_KEY = "hidden_overview";
 const CLOCK_KEY  = "world_clock_cities";
 const SPANS_KEY   = "spans_overview_v2";
-const HEIGHTS_KEY = "heights_overview_v2";
+const HEIGHTS_KEY = "heights_overview_px";
 const NUM_COLS    = 6;
 const GRID_GAP    = 20;
-const ROW_HEIGHT  = 220;
-const MIN_ROWS    = 1;
-const MAX_ROWS    = 6;
+const MIN_HEIGHT  = 120;
+const MAX_HEIGHT  = 1400;
 
 const DEFAULT_ORDER = ["upcoming_events", "world_clock", "tasks_due", "routines", "fitness_snapshot", "last_expense"];
 const DEFAULT_SPANS: Record<string, number> = {
@@ -32,12 +31,12 @@ const DEFAULT_SPANS: Record<string, number> = {
 };
 
 const DEFAULT_HEIGHTS: Record<string, number> = {
-  upcoming_events:  2,
-  world_clock:      1,
-  tasks_due:        1,
-  routines:         1,
-  fitness_snapshot: 1,
-  last_expense:     1,
+  upcoming_events:  440,
+  world_clock:      220,
+  tasks_due:        220,
+  routines:         220,
+  fitness_snapshot: 220,
+  last_expense:     220,
 };
 
 interface CalEvent   { id: string; title: string; start: string; end?: string }
@@ -110,7 +109,8 @@ function SortableCard({ id, span = 3, height = 1, onResizeStart, onHeightResizeS
         transform: CSS.Transform.toString(transform), transition,
         position: "relative",
         gridColumn: `span ${span}`,
-        gridRow: `span ${height}`,
+        height: `${height}px`,
+        alignSelf: "start",
         display: "flex",
         flexDirection: "column",
       }}
@@ -201,11 +201,11 @@ export default function OverviewPage() {
   const [addingCity, setAddingCity]   = useState(false);
   const [editCityIdx, setEditCityIdx] = useState<number | null>(null);
   const [hoveredCity, setHoveredCity] = useState<number | null>(null);
+  const [viewYear,  setViewYear]  = useState(() => new Date().getFullYear());
+  const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
 
   const now      = new Date();
   const dateStr  = now.toLocaleDateString("en-SG", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-  const calYear  = now.getFullYear();
-  const calMonth = now.getMonth();
   const todayStr = now.toISOString().slice(0, 10);
 
   useEffect(() => {
@@ -231,15 +231,12 @@ export default function OverviewPage() {
     try {
       const { data } = await supabase
         .from("fitness_daily")
-        .select("steps,sleep_duration_min,body_battery_high,hrv_score")
+        .select("steps,sleep_duration_min,hrv_score")
         .eq("date", today)
         .maybeSingle();
       setFitness(data as Record<string, number | null> | null);
     } catch { /* supabase offline */ }
 
-    const n   = new Date();
-    const ym  = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`;
-    try { const c = await apiFetch<CalEvent[]>(`/calendar?month=${ym}`); setEvents(c); } catch { /* offline */ }
     try { const t = await apiFetch<Task[]>("/tasks"); setTasks(t.filter(t => t.status === "needsAction")); } catch { /* offline */ }
     try {
       const v = await apiFetch<VarExpense[]>("/finance/variable");
@@ -252,6 +249,13 @@ export default function OverviewPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const fetchCalendarMonth = useCallback(async (year: number, month: number) => {
+    const ym = `${year}-${String(month + 1).padStart(2, "0")}`;
+    try { const c = await apiFetch<CalEvent[]>(`/calendar?month=${ym}`); setEvents(c); } catch { /* offline */ }
+  }, []);
+
+  useEffect(() => { fetchCalendarMonth(viewYear, viewMonth); }, [viewYear, viewMonth, fetchCalendarMonth]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -303,8 +307,7 @@ export default function OverviewPage() {
     const startY      = e.clientY;
     const startHeight = heights[id] ?? DEFAULT_HEIGHTS[id] ?? 1;
     function onMove(mv: MouseEvent) {
-      const delta = Math.round((mv.clientY - startY) / (ROW_HEIGHT + GRID_GAP));
-      handleHeightChange(id, Math.max(MIN_ROWS, Math.min(MAX_ROWS, startHeight + delta)));
+      handleHeightChange(id, Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, startHeight + (mv.clientY - startY))));
     }
     function onUp() {
       window.removeEventListener("mousemove", onMove);
@@ -345,14 +348,29 @@ export default function OverviewPage() {
     try { await apiFetch(`/routines/${id}/toggle`, { method: "PATCH" }); } catch { load(); }
   }
 
+  async function completeTask(id: string, list_id: string) {
+    setTasks(prev => prev.filter(t => t.id !== id));
+    try { await apiFetch(`/tasks/${id}/complete?list_id=${encodeURIComponent(list_id)}`, { method: "POST" }); } catch { load(); }
+  }
+
+  function prevMonth() {
+    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
+    else { setViewMonth(m => m - 1); }
+  }
+
+  function nextMonth() {
+    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0); }
+    else { setViewMonth(m => m + 1); }
+  }
+
   // ── Calendar helpers ───────────────────────────────────────────────────────
-  const daysInMonth  = new Date(calYear, calMonth + 1, 0).getDate();
-  const firstWeekday = new Date(calYear, calMonth, 1).getDay();
-  const eventDates   = new Set(events.map(e => e.start.slice(0, 10)));
-  const upcomingEvents = events
-    .filter(e => e.start.slice(0, 10) >= todayStr)
-    .sort((a, b) => a.start.localeCompare(b.start))
-    .slice(0, 5);
+  const daysInMonth    = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const firstWeekday   = new Date(viewYear, viewMonth, 1).getDay();
+  const eventDates     = new Set(events.map(e => e.start.slice(0, 10)));
+  const isCurrentMonth = viewYear === now.getFullYear() && viewMonth === now.getMonth();
+  const visibleEvents  = events
+    .filter(e => isCurrentMonth ? e.start.slice(0, 10) >= todayStr : true)
+    .sort((a, b) => a.start.localeCompare(b.start));
 
   // ── World clock helpers ────────────────────────────────────────────────────
   const usedTzs        = new Set(cities.map(c => c.tz));
@@ -371,10 +389,9 @@ export default function OverviewPage() {
         {fitness ? (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             {[
-              { label: "Steps",        value: fitness.steps?.toLocaleString(),                         unit: "" },
-              { label: "Sleep",        value: sleepH !== null ? `${sleepH}h ${sleepM}m` : null,        unit: "" },
-              { label: "Body Battery", value: fitness.body_battery_high,                               unit: "%" },
-              { label: "HRV",          value: fitness.hrv_score,                                       unit: "ms" },
+              { label: "Steps", value: fitness.steps?.toLocaleString(),                   unit: "" },
+              { label: "Sleep", value: sleepH !== null ? `${sleepH}h ${sleepM}m` : null, unit: "" },
+              { label: "HRV",   value: fitness.hrv_score,                                unit: "ms" },
             ].map(({ label, value, unit }) => (
               <div key={label}>
                 <div className="label" style={{ marginBottom: 4 }}>{label}</div>
@@ -390,10 +407,28 @@ export default function OverviewPage() {
     ),
 
     upcoming_events: (
-      <Widget title="◷ Upcoming Events" accent="var(--violet)">
+      <Widget title="◷ Calendar" accent="var(--violet)">
         <div style={{ display: "flex", flexDirection: "row", gap: 20 }}>
           {/* Left: Mini calendar */}
           <div style={{ flexShrink: 0, width: 200 }}>
+            {/* Month nav bar */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <button
+                onClick={prevMonth}
+                style={{ background: "transparent", border: "none", color: "var(--text-3)", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 4px", transition: "color 0.15s" }}
+                onMouseEnter={e => (e.currentTarget.style.color = "var(--cyan)")}
+                onMouseLeave={e => (e.currentTarget.style.color = "var(--text-3)")}
+              >‹</button>
+              <span style={{ fontFamily: "var(--font-space)", fontSize: 11, fontWeight: 600, color: "var(--text-2)", letterSpacing: "0.04em" }}>
+                {new Date(viewYear, viewMonth).toLocaleDateString("en-SG", { month: "long", year: "numeric" })}
+              </span>
+              <button
+                onClick={nextMonth}
+                style={{ background: "transparent", border: "none", color: "var(--text-3)", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 4px", transition: "color 0.15s" }}
+                onMouseEnter={e => (e.currentTarget.style.color = "var(--cyan)")}
+                onMouseLeave={e => (e.currentTarget.style.color = "var(--text-3)")}
+              >›</button>
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 6 }}>
               {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(d => (
                 <div key={d} style={{ textAlign: "center", fontSize: 9, color: "var(--text-3)", fontFamily: "var(--font-mono)", padding: "2px 0", letterSpacing: "0.05em" }}>{d}</div>
@@ -402,7 +437,7 @@ export default function OverviewPage() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
               {Array.from({ length: firstWeekday }).map((_, i) => <div key={`e${i}`} />)}
               {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
-                const dateKey  = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                const dateKey  = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                 const hasEvent = eventDates.has(dateKey);
                 const isToday  = dateKey === todayStr;
                 return (
@@ -424,11 +459,11 @@ export default function OverviewPage() {
           {/* Vertical divider */}
           <div style={{ width: 1, background: "var(--border)", alignSelf: "stretch" }} />
 
-          {/* Right: Upcoming event list */}
+          {/* Right: Event list for viewed month */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            {upcomingEvents.length > 0 ? (
+            {visibleEvents.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {upcomingEvents.map(e => (
+                {visibleEvents.map(e => (
                   <div key={e.id} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                     <div style={{ width: 2, minHeight: 32, background: "var(--violet)", borderRadius: 2, flexShrink: 0, marginTop: 3 }} />
                     <div>
@@ -438,7 +473,11 @@ export default function OverviewPage() {
                   </div>
                 ))}
               </div>
-            ) : <p style={{ color: "var(--text-3)", fontSize: 13 }}>No upcoming events this month.</p>}
+            ) : (
+              <p style={{ color: "var(--text-3)", fontSize: 13 }}>
+                No events in {new Date(viewYear, viewMonth).toLocaleDateString("en-SG", { month: "long" })}.
+              </p>
+            )}
           </div>
         </div>
       </Widget>
@@ -539,7 +578,13 @@ export default function OverviewPage() {
                       <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 4 }}>
                         {listTasks.map(t => (
                           <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <div style={{ width: 14, height: 14, borderRadius: 4, border: "1px solid var(--border-hover)", flexShrink: 0 }} />
+                            <button
+                              onClick={() => completeTask(t.id, t.list_id ?? "@default")}
+                              title="Mark as done"
+                              style={{ width: 16, height: 16, borderRadius: 4, border: "1px solid var(--border-hover)", background: "transparent", cursor: "pointer", flexShrink: 0, transition: "background 0.15s, border-color 0.15s", padding: 0 }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--cyan-dim)"; (e.currentTarget as HTMLElement).style.borderColor = "var(--cyan)"; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.borderColor = "var(--border-hover)"; }}
+                            />
                             <div>
                               <div style={{ fontSize: 13, color: "var(--text-1)" }}>{t.title}</div>
                               {t.due && <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-3)", marginTop: 1 }}>Due {t.due.slice(0, 10)}</div>}
@@ -620,7 +665,7 @@ export default function OverviewPage() {
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={visible} strategy={rectSortingStrategy}>
-          <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 20, gridAutoRows: `${ROW_HEIGHT}px` }}>
+          <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 20, alignItems: "start" }}>
             {visible.map(id => (
               <SortableCard
                 key={id}
