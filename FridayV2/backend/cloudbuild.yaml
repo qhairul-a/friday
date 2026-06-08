@@ -64,3 +64,6 @@ steps:
 images:
   - asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-bot:$COMMIT_SHA
   - asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-voice:$COMMIT_SHA
+
+options:
+  logging: CLOUD_LOGGING_ONLY
