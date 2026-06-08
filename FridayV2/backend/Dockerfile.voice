@@ -7,5 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# LiveKit voice agent
-CMD ["python", "voice/livekit_agent.py", "start"]
+RUN chmod +x startup-voice.sh
+
+# Starts a health server on $PORT (Cloud Run requirement) then runs the LiveKit agent
+CMD ["/bin/bash", "startup-voice.sh"]
