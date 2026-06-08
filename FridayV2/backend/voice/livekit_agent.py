@@ -382,5 +382,5 @@ if __name__ == "__main__":
         entrypoint_fnc=entrypoint,
         agent_name="friday-2.0",
         num_idle_processes=1,
-        initialize_process_timeout=60.0,
+        initialize_process_timeout=120.0,
     ))
