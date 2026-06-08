@@ -612,6 +612,35 @@ def get_notes(limit: int = 10):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/notes/search")
+def search_notes_endpoint(q: str = ""):
+    try:
+        from integrations.gdrive_notes import _get_service, _get_friday_folder_id, _strip_timestamp
+        if not q or len(q.strip()) < 2:
+            return []
+        service = _get_service()
+        folder_id = _get_friday_folder_id(service)
+        keywords = [kw.lower().replace("'", "\\'") for kw in q.split() if len(kw) > 1]
+        seen: dict = {}
+        for kw in keywords[:3]:
+            result = service.files().list(
+                q=f"'{folder_id}' in parents and trashed=false and fullText contains '{kw}'",
+                fields="files(id, name, modifiedTime)",
+                orderBy="modifiedTime desc",
+                pageSize=20,
+            ).execute()
+            for f in result.get("files", []):
+                if f["id"] not in seen:
+                    seen[f["id"]] = {
+                        "id": f["id"],
+                        "title": _strip_timestamp(f["name"]),
+                        "modified": f["modifiedTime"][:10],
+                    }
+        return list(seen.values())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/notes/tree")
 def get_notes_tree():
     try:

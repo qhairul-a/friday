@@ -199,7 +199,10 @@ export default function MobileShell() {
       }} />
 
       {/* Header */}
-      <MobileHeader onSettingsPress={() => setSettingsOpen(true)} />
+      <MobileHeader
+        onSettingsPress={() => setSettingsOpen(true)}
+        onHomePress={() => setActiveTab(null)}
+      />
 
       {/* Top tab bar */}
       <nav style={{

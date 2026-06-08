@@ -4,6 +4,7 @@ import { useFinanceVisibility } from "@/lib/finance-visibility";
 
 interface MobileHeaderProps {
   onSettingsPress: () => void;
+  onHomePress: () => void;
 }
 
 function EyeOpen() {
@@ -27,7 +28,7 @@ function EyeClosed() {
   );
 }
 
-export default function MobileHeader({ onSettingsPress }: MobileHeaderProps) {
+export default function MobileHeader({ onSettingsPress, onHomePress }: MobileHeaderProps) {
   const { visible, toggle } = useFinanceVisibility();
 
   return (
@@ -42,16 +43,21 @@ export default function MobileHeader({ onSettingsPress }: MobileHeaderProps) {
       padding: "0 16px",
       paddingTop: "env(safe-area-inset-top)",
     }}>
-      <span style={{
-        fontFamily: "var(--font-space)",
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: "0.18em",
-        textTransform: "uppercase",
-        color: "rgba(34,211,238,0.5)",
-      }}>
+      <button
+        onClick={onHomePress}
+        style={{
+          background: "none", border: "none", cursor: "pointer", padding: "4px 0",
+          fontFamily: "var(--font-space)",
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          color: "rgba(34,211,238,0.5)",
+          WebkitTapHighlightColor: "transparent",
+        }}
+      >
         FRIDAY
-      </span>
+      </button>
 
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         {/* Finance visibility toggle */}
