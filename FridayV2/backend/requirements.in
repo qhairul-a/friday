@@ -1,0 +1,31 @@
+# Direct dependencies — edit this file, then run:
+# python -m uv pip compile requirements.in --python-version 3.14 --python-platform linux -o requirements.txt
+
+anthropic>=0.40.0
+pydantic-settings>=2.0.0
+python-dotenv>=1.0.0
+
+supabase>=2.9.1
+
+python-telegram-bot[job-queue]>=21.0
+
+google-auth>=2.0.0
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.2.0
+google-api-python-client>=2.0.0
+google-cloud-texttospeech>=2.0.0
+
+# LiveKit — pinned to prevent pip crawling hundreds of versions
+livekit-agents==1.5.17
+livekit-plugins-deepgram==1.5.17
+livekit-plugins-anthropic==1.5.17
+livekit-plugins-google==1.5.17
+
+requests>=2.31.0
+tavily-python>=0.3.0
+garminconnect>=0.3.0
+
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+
+tzdata>=2024.1
