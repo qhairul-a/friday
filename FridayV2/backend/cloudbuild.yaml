@@ -80,7 +80,7 @@ steps:
       - --region=asia-southeast1
       - --platform=managed
       - --no-allow-unauthenticated
-      - --memory=2Gi
+      - --memory=4Gi
       - --cpu=2
       - --min-instances=1
       - --update-secrets=ANTHROPIC_API_KEY=anthropic-api-key:latest,SUPABASE_URL=supabase-url:latest,SUPABASE_KEY=supabase-key:latest,TELEGRAM_BOT_TOKEN=telegram-bot-token:latest,TELEGRAM_USER_ID=telegram-user-id:latest,LIVEKIT_API_KEY=livekit-api-key:latest,LIVEKIT_API_SECRET=livekit-api-secret:latest,DEEPGRAM_API_KEY=deepgram-api-key:latest,TAVILY_API_KEY=tavily-api-key:latest,GARMIN_EMAIL=garmin-email:latest,GARMIN_PASSWORD=garmin-password:latest,FINANCE_FOLDER_ID=finance-folder-id:latest,GOOGLE_CLIENT_SECRET_JSON=google-client-secret:latest,GDRIVE_TOKEN_JSON=gdrive-token:latest
