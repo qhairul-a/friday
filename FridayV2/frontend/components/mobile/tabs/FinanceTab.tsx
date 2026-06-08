@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import {
+  PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  BarChart, Bar, LabelList,
+} from "recharts";
 import { apiFetch } from "@/lib/api";
 import { useFinanceVisibility } from "@/lib/finance-visibility";
 
@@ -12,13 +17,19 @@ interface Summary {
   currency: string;
   by_category: Record<string, number>;
 }
-interface VarExpense { _index: number; date: string; category: string; description: string; amount: string }
-interface FixedExpense { _index: number; item: string; cost: string; comments: string }
+interface VarExpense {
+  _index: number; date: string; category: string;
+  description: string; amount: string;
+}
 
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function fmtMonth(ym: string): string {
   const [y, m] = ym.split("-");
   return `${MONTH_NAMES[parseInt(m) - 1]} ${y}`;
+}
+function fmtMonthShort(ym: string): string {
+  const [y, m] = ym.split("-");
+  return `${MONTH_NAMES[parseInt(m) - 1]}-${y.slice(2)}`;
 }
 function parseAmt(s: string | number): number {
   return parseFloat(String(s).replace(/[$,\s]/g, "")) || 0;
@@ -42,27 +53,30 @@ const TILE: React.CSSProperties = {
 };
 
 const CAT_COLORS = ["var(--cyan)","var(--violet)","#fb923c","#34d399","#60a5fa","#f472b6","#fbbf24","#a78bfa"];
+const AXIS  = { fill: "var(--text-3)", fontSize: 9, fontFamily: "var(--font-mono)" };
+const GRID  = { strokeDasharray: "2 6", stroke: "rgba(34,211,238,0.06)" };
+const TIP   = { background: "rgba(7,13,31,0.95)", border: "1px solid rgba(34,211,238,0.15)", borderRadius: 8, fontFamily: "var(--font-mono)", fontSize: 10 };
 
 export default function FinanceTab() {
   const { visible } = useFinanceVisibility();
 
-  const [month,   setMonth]   = useState(new Date().toISOString().slice(0,7));
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [variable,setVariable]= useState<VarExpense[]>([]);
-  const [fixed,   setFixed]   = useState<FixedExpense[]>([]);
-  const [income,  setIncome]  = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState<string | null>(null);
+  const [month,      setMonth]      = useState(new Date().toISOString().slice(0, 7));
+  const [summary,    setSummary]    = useState<Summary | null>(null);
+  const [variable,   setVariable]   = useState<VarExpense[]>([]);
+  const [allVariable,setAllVariable]= useState<VarExpense[]>([]);
+  const [income,     setIncome]     = useState(0);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [s, v, f] = await Promise.all([
+      const [s, v, av] = await Promise.all([
         apiFetch<Summary>(`/finance/summary?month=${month}`),
         apiFetch<VarExpense[]>(`/finance/variable?month=${month}`),
-        apiFetch<FixedExpense[]>("/finance/fixed"),
+        apiFetch<VarExpense[]>("/finance/variable/all"),
       ]);
-      setSummary(s); setVariable(v); setFixed(f);
+      setSummary(s); setVariable(v); setAllVariable(av);
       try {
         const inc = await apiFetch<{ amount: number }>("/finance/income");
         setIncome(inc.amount);
@@ -97,47 +111,74 @@ export default function FinanceTab() {
     <div style={{ padding: 16, color: "#f87171", fontFamily: "var(--font-mono)", fontSize: 11 }}>Error: {error}</div>
   );
 
-  const balance = income > 0 ? income - (summary?.fixed_total ?? 0) - (summary?.variable_total ?? 0) : null;
+  const balance = income > 0
+    ? income - (summary?.fixed_total ?? 0) - (summary?.variable_total ?? 0)
+    : null;
   const cur = summary?.currency ?? "SGD";
 
+  // ── Category bar data (current month) ──────────────────────────────────────
   const categories = summary
     ? Object.entries(summary.by_category).sort((a, b) => b[1] - a[1])
     : [];
   const maxCat = categories[0]?.[1] ?? 1;
 
-  const recentVar = [...variable]
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 8);
+  // ── Pie data ────────────────────────────────────────────────────────────────
+  const pieData = categories.map(([name, value]) => ({ name, value }));
+
+  // ── Trend + frequency data (all-time) ──────────────────────────────────────
+  const allMonths      = [...new Set(allVariable.map(v => v.date.slice(0, 7)))].sort();
+  const allCategories  = [...new Set(allVariable.map(v => v.category))];
+
+  const trendData = allMonths.map(m => {
+    const row: Record<string, number | string> = { month: fmtMonthShort(m) };
+    allCategories.forEach(cat => {
+      row[cat] = allVariable
+        .filter(v => v.date.startsWith(m) && v.category === cat)
+        .reduce((s, v) => s + parseAmt(v.amount), 0);
+    });
+    return row;
+  });
+
+  const countData = allMonths.map(m => ({
+    month: fmtMonthShort(m),
+    count: allVariable.filter(v => v.date.startsWith(m)).length,
+  }));
+
+  const avgData = allMonths.map(m => {
+    const entries = allVariable.filter(v => v.date.startsWith(m));
+    const total   = entries.reduce((s, v) => s + parseAmt(v.amount), 0);
+    return {
+      month: fmtMonthShort(m),
+      avg: entries.length ? Math.round((total / entries.length) * 100) / 100 : 0,
+    };
+  });
+
+  const recentVar = [...variable].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
 
   return (
     <div style={{ padding: "14px 14px 80px" }}>
 
       {/* Month navigator */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        marginBottom: 4,
-      }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
         <button onClick={() => shiftMonth(-1)} style={{
           background: "none", border: "1px solid rgba(34,211,238,0.2)", borderRadius: 6,
-          color: "var(--text-2)", cursor: "pointer", fontSize: 16, lineHeight: 1,
-          padding: "3px 10px",
+          color: "var(--text-2)", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "3px 10px",
         }}>‹</button>
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--cyan)", letterSpacing: "0.1em" }}>
           {fmtMonth(month)}
         </span>
         <button
           onClick={() => shiftMonth(1)}
-          disabled={month >= new Date().toISOString().slice(0,7)}
+          disabled={month >= new Date().toISOString().slice(0, 7)}
           style={{
             background: "none", border: "1px solid rgba(34,211,238,0.2)", borderRadius: 6,
-            color: "var(--text-2)", cursor: "pointer", fontSize: 16, lineHeight: 1,
-            padding: "3px 10px",
-            opacity: month >= new Date().toISOString().slice(0,7) ? 0.3 : 1,
+            color: "var(--text-2)", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "3px 10px",
+            opacity: month >= new Date().toISOString().slice(0, 7) ? 0.3 : 1,
           }}
         >›</button>
       </div>
 
-      {/* Summary tiles */}
+      {/* ── Summary tiles ──────────────────────────────────────────────────── */}
       <div style={SECTION}>Monthly Summary</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
         {income > 0 && (
@@ -180,7 +221,47 @@ export default function FinanceTab() {
         )}
       </div>
 
-      {/* Category breakdown */}
+      {/* ── Variable Expense Breakdown (pie) ───────────────────────────────── */}
+      <div style={SECTION}>Variable Expense Breakdown</div>
+      <div style={{ ...CARD, padding: "16px 14px" }}>
+        {pieData.length === 0 ? (
+          <p style={{ color: "var(--text-3)", fontSize: 12 }}>No variable expenses this month</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={220}>
+            <PieChart>
+              <Pie
+                data={pieData} cx="50%" cy="44%"
+                outerRadius={72} dataKey="value" nameKey="name"
+                labelLine={false}
+                label={({ cx = 0, cy = 0, midAngle = 0, innerRadius = 0, outerRadius = 0, percent = 0 }) => {
+                  if (percent < 0.06) return null;
+                  const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+                  const x = cx + r * Math.cos((-midAngle) * Math.PI / 180);
+                  const y = cy + r * Math.sin((-midAngle) * Math.PI / 180);
+                  return (
+                    <text x={x} y={y} fill="white" textAnchor="middle"
+                      dominantBaseline="central" fontSize={9} fontFamily="var(--font-mono)">
+                      {`${(percent * 100).toFixed(0)}%`}
+                    </text>
+                  );
+                }}
+              >
+                {pieData.map((_, i) => <Cell key={i} fill={CAT_COLORS[i % CAT_COLORS.length]} />)}
+              </Pie>
+              <Tooltip
+                contentStyle={TIP}
+                formatter={(v) => visible ? `${cur} ${(+(v ?? 0)).toFixed(2)}` : "••••"}
+              />
+              <Legend
+                iconType="square" iconSize={8}
+                wrapperStyle={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-3)" }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* ── Category bar breakdown (current month) ─────────────────────────── */}
       {categories.length > 0 && (
         <>
           <div style={SECTION}>Spending by Category</div>
@@ -211,59 +292,109 @@ export default function FinanceTab() {
         </>
       )}
 
-      {/* Recent variable expenses */}
-      <div style={SECTION}>Recent Expenses</div>
-      <div style={CARD}>
-        {recentVar.length === 0
-          ? <p style={{ color: "var(--text-3)", fontSize: 12 }}>No expenses this month</p>
-          : recentVar.map((v, i) => (
-            <div key={v._index} style={{
-              display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-              paddingBottom: i < recentVar.length - 1 ? 8 : 0,
-              marginBottom: i < recentVar.length - 1 ? 8 : 0,
-              borderBottom: i < recentVar.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
-            }}>
-              <div>
-                <p style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 2 }}>{v.description}</p>
-                <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-3)" }}>
-                  {v.category} · {v.date}
-                </p>
-              </div>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: "var(--orange)", flexShrink: 0, marginLeft: 8 }}>
-                {visible ? parseAmt(v.amount).toFixed(2) : "••••"}
-              </span>
-            </div>
-          ))
-        }
+      {/* ── Spending Trend by Category (line) ──────────────────────────────── */}
+      <div style={SECTION}>Spending Trend — by Category</div>
+      <div style={{ ...CARD, padding: "16px 14px" }}>
+        {trendData.length === 0 ? (
+          <p style={{ color: "var(--text-3)", fontSize: 12 }}>Not enough data yet</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={trendData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+              <CartesianGrid {...GRID} />
+              <XAxis dataKey="month" tick={AXIS} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={AXIS} axisLine={false} tickLine={false} width={44} />
+              <Tooltip
+                contentStyle={TIP}
+                formatter={(v) => visible ? `${cur} ${(+(v ?? 0)).toFixed(2)}` : "••••"}
+              />
+              <Legend
+                iconType="square" iconSize={8}
+                wrapperStyle={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-3)" }}
+              />
+              {allCategories.map((cat, i) => (
+                <Line
+                  key={cat} type="monotone" dataKey={cat}
+                  stroke={CAT_COLORS[i % CAT_COLORS.length]}
+                  strokeWidth={1.5} dot={false} activeDot={{ r: 3 }}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
-      {/* Fixed expenses */}
-      {fixed.length > 0 && (
-        <>
-          <div style={SECTION}>Fixed Expenses</div>
-          <div style={CARD}>
-            {fixed.map((f, i) => (
-              <div key={f._index} style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                paddingBottom: i < fixed.length - 1 ? 8 : 0,
-                marginBottom: i < fixed.length - 1 ? 8 : 0,
-                borderBottom: i < fixed.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
-              }}>
-                <span style={{ fontSize: 11, color: "var(--text-2)" }}>{f.item}</span>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "#f87171", flexShrink: 0, marginLeft: 8 }}>
-                  {visible ? `${parseFloat(f.cost).toFixed(2)}` : "••••"}
-                </span>
-              </div>
-            ))}
-            <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-3)", letterSpacing: "0.08em" }}>TOTAL / MO</span>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 700, color: "#f87171" }}>
-                {visible ? `${cur} ${fixed.reduce((s, f) => s + parseFloat(f.cost || "0"), 0).toFixed(2)}` : "••••"}
-              </span>
+      {/* ── Spending Frequency ─────────────────────────────────────────────── */}
+      <div style={SECTION}>Spending Frequency</div>
+      <div style={{ ...CARD, padding: "16px 14px" }}>
+        {countData.length === 0 ? (
+          <p style={{ color: "var(--text-3)", fontSize: 12 }}>Not enough data yet</p>
+        ) : (
+          <>
+            {/* Entry count per month */}
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--text-3)", letterSpacing: "0.08em", marginBottom: 6 }}>
+              ENTRIES / MONTH
+            </p>
+            <ResponsiveContainer width="100%" height={140}>
+              <BarChart data={countData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                <CartesianGrid {...GRID} />
+                <XAxis dataKey="month" tick={AXIS} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                <YAxis tick={AXIS} axisLine={false} tickLine={false} allowDecimals={false} width={28} />
+                <Tooltip contentStyle={TIP} />
+                <Bar dataKey="count" fill="var(--cyan)" radius={[3, 3, 0, 0]}>
+                  <LabelList dataKey="count" position="top"
+                    style={{ fill: "var(--text-3)", fontSize: 8, fontFamily: "var(--font-mono)" }} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+
+            {/* Avg amount per entry */}
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--text-3)", letterSpacing: "0.08em", marginTop: 12, marginBottom: 6 }}>
+              AVG AMOUNT / ENTRY ({cur})
+            </p>
+            <ResponsiveContainer width="100%" height={140}>
+              <LineChart data={avgData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                <CartesianGrid {...GRID} />
+                <XAxis dataKey="month" tick={AXIS} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                <YAxis tick={AXIS} axisLine={false} tickLine={false} width={44} />
+                <Tooltip
+                  contentStyle={TIP}
+                  formatter={(v) => visible ? `${cur} ${(+(v ?? 0)).toFixed(2)}` : "••••"}
+                />
+                <Line
+                  type="monotone" dataKey="avg"
+                  stroke="var(--orange)" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </>
+        )}
+      </div>
+
+      {/* ── Recent Variable Expenses ────────────────────────────────────────── */}
+      <div style={SECTION}>Recent Expenses</div>
+      <div style={CARD}>
+        {recentVar.length === 0 ? (
+          <p style={{ color: "var(--text-3)", fontSize: 12 }}>No expenses this month</p>
+        ) : recentVar.map((v, i) => (
+          <div key={v._index} style={{
+            display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+            paddingBottom: i < recentVar.length - 1 ? 8 : 0,
+            marginBottom: i < recentVar.length - 1 ? 8 : 0,
+            borderBottom: i < recentVar.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+          }}>
+            <div>
+              <p style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 2 }}>{v.description}</p>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-3)" }}>
+                {v.category} · {v.date}
+              </p>
             </div>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: "var(--orange)", flexShrink: 0, marginLeft: 8 }}>
+              {visible ? parseAmt(v.amount).toFixed(2) : "••••"}
+            </span>
           </div>
-        </>
-      )}
+        ))}
+      </div>
+
     </div>
   );
 }

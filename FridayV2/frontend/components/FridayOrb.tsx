@@ -38,7 +38,7 @@ interface OrbConfig {
 const CYAN:   [number, number, number] = [34,  211, 238];
 const VIOLET: [number, number, number] = [167, 139, 250];
 const ORANGE: [number, number, number] = [251, 191, 36];
-const DIM:    [number, number, number] = [71,  85,  105];
+const DIM:    [number, number, number] = [110, 140, 175];
 
 // Physics
 const COL_R        = 6;     // collision radius per ring particle (px)
@@ -84,7 +84,7 @@ function initParticles(cx: number, cy: number, wallR: number): Particle[] {
         orbitR: orbitRadii[ri],
         x: cx, y: cy,
         px: PIXEL_SIZES[Math.floor(Math.random() * PIXEL_SIZES.length)],
-        opacity: 0.65 + Math.random() * 0.35,
+        opacity: 0.82 + Math.random() * 0.18,
         color: Math.random() < 0.65 ? CYAN : VIOLET,
         flickerPhase: Math.floor(Math.random() * 60),
         flickerRate: Math.random() < 0.3 ? Math.floor(2 + Math.random() * 4) : 0,
@@ -108,7 +108,7 @@ function initParticles(cx: number, cy: number, wallR: number): Particle[] {
       orbitR: wallR * (0.85 + Math.random() * 0.18),
       x: cx, y: cy,
       px: 2,
-      opacity: 0.20 + Math.random() * 0.25,
+      opacity: 0.42 + Math.random() * 0.30,
       color: Math.random() < 0.6 ? VIOLET : CYAN,
       flickerPhase: Math.floor(Math.random() * 60),
       flickerRate: 0,
