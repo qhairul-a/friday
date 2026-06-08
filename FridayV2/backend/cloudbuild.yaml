@@ -11,34 +11,52 @@ steps:
       - --description=Friday V2 container images
     allowFailure: true
 
-  # Build Telegram bot image
+  # Pull previous bot image for layer cache (allowFailure for first build)
+  - name: gcr.io/cloud-builders/docker
+    args: [pull, asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-bot:latest]
+    allowFailure: true
+
+  # Pull previous voice image for layer cache (allowFailure for first build)
+  - name: gcr.io/cloud-builders/docker
+    args: [pull, asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-voice:latest]
+    allowFailure: true
+
+  # Build Telegram bot image (with layer cache)
   - name: gcr.io/cloud-builders/docker
     dir: FridayV2/backend
     args:
       - build
+      - --cache-from
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-bot:latest
       - -t
       - asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-bot:$COMMIT_SHA
+      - -t
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-bot:latest
       - -f
       - Dockerfile
       - .
 
-  # Build LiveKit voice agent image
+  # Build LiveKit voice agent image (with layer cache)
   - name: gcr.io/cloud-builders/docker
     dir: FridayV2/backend
     args:
       - build
+      - --cache-from
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-voice:latest
       - -t
       - asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-voice:$COMMIT_SHA
+      - -t
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-voice:latest
       - -f
       - Dockerfile.voice
       - .
 
-  # Push both images
+  # Push both images (commit SHA + latest tags)
   - name: gcr.io/cloud-builders/docker
-    args: [push, asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-bot:$COMMIT_SHA]
+    args: [push, --all-tags, asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-bot]
 
   - name: gcr.io/cloud-builders/docker
-    args: [push, asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-voice:$COMMIT_SHA]
+    args: [push, --all-tags, asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-voice]
 
   # Deploy Telegram bot + dashboard API to Cloud Run (port 8001)
   - name: gcr.io/cloud-builders/gcloud
