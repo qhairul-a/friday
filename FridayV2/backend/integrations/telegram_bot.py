@@ -46,7 +46,7 @@ def _is_authorized(update: Update) -> bool:
     return update.effective_user.id == settings.TELEGRAM_USER_ID
 
 
-async def _transcribe_voice(file_path: str) -> str:
+def _transcribe_voice(file_path: str) -> str:
     """Transcribe a voice file using Deepgram REST API."""
     url = "https://api.deepgram.com/v1/listen?model=nova-2&language=en"
     headers = {
@@ -88,10 +88,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     history = _get_history(update.effective_user.id)
-    response, updated_history = run_friday(user_input, history)
-    _set_history(update.effective_user.id, updated_history)
-    await update.message.reply_text(response)
-    asyncio.create_task(asyncio.to_thread(extract_and_save, user_input, response))
+    try:
+        response, updated_history = await asyncio.to_thread(run_friday, user_input, history)
+        _set_history(update.effective_user.id, updated_history)
+        await update.message.reply_text(response)
+        asyncio.create_task(asyncio.to_thread(extract_and_save, user_input, response))
+    except Exception as e:
+        logger.error("handle_text failed: %s", e, exc_info=True)
+        await update.message.reply_text("Sorry, something went wrong. Try again.")
 
 
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -106,7 +110,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     try:
         await voice_file.download_to_drive(tmp_path)
-        transcript = await _transcribe_voice(tmp_path)
+        transcript = await asyncio.to_thread(_transcribe_voice, tmp_path)
     finally:
         os.unlink(tmp_path)
 
@@ -115,10 +119,14 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
 
     history = _get_history(update.effective_user.id)
-    response, updated_history = run_friday(transcript, history)
-    _set_history(update.effective_user.id, updated_history)
-    await update.message.reply_text(f'_"{transcript}"_\n\n{response}', parse_mode="Markdown")
-    asyncio.create_task(asyncio.to_thread(extract_and_save, transcript, response))
+    try:
+        response, updated_history = await asyncio.to_thread(run_friday, transcript, history)
+        _set_history(update.effective_user.id, updated_history)
+        await update.message.reply_text(f'_"{transcript}"_\n\n{response}', parse_mode="Markdown")
+        asyncio.create_task(asyncio.to_thread(extract_and_save, transcript, response))
+    except Exception as e:
+        logger.error("handle_voice run_friday failed: %s", e, exc_info=True)
+        await update.message.reply_text("Sorry, something went wrong processing your voice message.")
 
 
 async def send_daily_health_push(context: ContextTypes.DEFAULT_TYPE) -> None:

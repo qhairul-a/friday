@@ -366,7 +366,7 @@ if __name__ == "__main__":
     cli.run_app(WorkerOptions(
         entrypoint_fnc=entrypoint,
         agent_name="friday-2.0",
-        num_idle_processes=0,
+        num_idle_processes=1,
         initialize_process_timeout=120.0,
         load_fnc=lambda: 0.0,
     ))

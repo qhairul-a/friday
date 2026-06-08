@@ -26,7 +26,7 @@ async def run_telegram():
     print("Friday is online. Listening on Telegram...")
     await app.initialize()
     await app.start()
-    await app.updater.start_polling(drop_pending_updates=True)
+    await app.updater.start_polling(drop_pending_updates=False)
     # Keep running until cancelled
     try:
         await asyncio.Event().wait()
