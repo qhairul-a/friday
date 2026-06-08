@@ -46,7 +46,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
 
 from livekit import rtc
-from livekit.agents import AgentSession, Agent, function_tool, JobContext, WorkerOptions, cli, room_io
+from livekit.agents import AgentSession, Agent, function_tool, JobContext, WorkerOptions, cli, room_io, JobExecutorType
 from livekit.plugins import deepgram, anthropic
 
 from core.config import settings
@@ -382,5 +382,5 @@ if __name__ == "__main__":
         entrypoint_fnc=entrypoint,
         agent_name="friday-2.0",
         num_idle_processes=0,
-        load_threshold=0.95,
+        job_executor_type=JobExecutorType.THREAD,
     ))
