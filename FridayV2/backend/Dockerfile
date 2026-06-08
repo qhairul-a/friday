@@ -7,5 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Telegram bot (main process)
-CMD ["python", "main.py"]
+RUN chmod +x startup.sh
+
+# Writes Google credential env vars to files, then starts the app
+CMD ["/bin/bash", "startup.sh"]
