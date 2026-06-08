@@ -5,10 +5,40 @@ Run: python voice/livekit_agent.py dev   (from FridayV2/backend/)
 """
 
 import asyncio
+import http.server
+import logging
 import os
+import socketserver
 import sys
+import threading
 from datetime import datetime
 from zoneinfo import ZoneInfo
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+
+def _start_health_server() -> None:
+    """Bind a minimal HTTP health server on $PORT for Cloud Run startup probe."""
+    port = int(os.environ.get("PORT", 8080))
+
+    class _H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"status":"ok"}')
+
+        def log_message(self, *args):
+            pass
+
+    try:
+        httpd = socketserver.TCPServer(("", port), _H)
+        httpd.allow_reuse_address = True
+        t = threading.Thread(target=httpd.serve_forever, daemon=True)
+        t.start()
+        logging.info("[friday-voice] health server started on port %d", port)
+    except Exception as e:
+        logging.warning("[friday-voice] could not start health server: %s", e)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -347,11 +377,10 @@ async def entrypoint(ctx: JobContext):
 
 
 if __name__ == "__main__":
+    _start_health_server()
     cli.run_app(WorkerOptions(
         entrypoint_fnc=entrypoint,
         agent_name="friday-2.0",
         num_idle_processes=0,
-        # Default init timeout is 10s — not enough for cold Python startup
-        # (all imports + module init) on Windows. 60s gives plenty of headroom.
         initialize_process_timeout=60.0,
     ))

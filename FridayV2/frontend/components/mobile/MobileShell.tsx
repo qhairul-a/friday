@@ -12,6 +12,24 @@ import MobileHomeControls from "./MobileHomeControls";
 import MobileSlidePanel from "./MobileSlidePanel";
 import MobileSettingsSheet from "./MobileSettingsSheet";
 
+const STATE_LABELS: Record<string, string> = {
+  disconnected: "Disconnected",
+  connecting: "Connecting…",
+  initializing: "Initializing…",
+  "pre-connect-buffering": "Buffering…",
+  listening: "Listening",
+  thinking: "Thinking",
+  speaking: "Speaking",
+  failed: "Failed",
+  idle: "Idle",
+};
+
+const STATE_COLORS: Record<string, string> = {
+  listening: "var(--cyan)",
+  thinking: "var(--violet)",
+  speaking: "var(--orange, #fb923c)",
+};
+
 // ── Inner component: must be inside LiveKitRoom to use LK hooks ──────────────
 
 function MobileConnectedView({ onDisconnect }: { onDisconnect: () => void }) {
@@ -43,13 +61,37 @@ function MobileConnectedView({ onDisconnect }: { onDisconnect: () => void }) {
           position: "absolute",
           inset: 0,
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
           touchAction: "none",
+          gap: 16,
         }}
       >
-        <div style={{ transform: "translateY(-18%)" }}>
+        <div style={{ transform: "translateY(-10%)" }}>
           <FridayOrb state={state} width={320} height={320} />
+        </div>
+        {/* State label */}
+        <div style={{
+          transform: "translateY(-10%)",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+        }}>
+          <div style={{
+            width: 6, height: 6, borderRadius: "50%",
+            background: STATE_COLORS[state] ?? "var(--text-3)",
+            boxShadow: STATE_COLORS[state] ? `0 0 8px ${STATE_COLORS[state]}` : "none",
+          }} />
+          <span style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            color: STATE_COLORS[state] ?? "var(--text-3)",
+          }}>
+            {STATE_LABELS[state] ?? state}
+          </span>
         </div>
       </div>
 
