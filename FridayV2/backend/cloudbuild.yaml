@@ -1,10 +1,22 @@
 steps:
+  # Create Artifact Registry repo if it doesn't exist
+  - name: gcr.io/cloud-builders/gcloud
+    args:
+      - artifacts
+      - repositories
+      - create
+      - friday
+      - --repository-format=docker
+      - --location=asia-southeast1
+      - --description=Friday V2 container images
+    allowFailure: true
+
   # Build Telegram bot image
   - name: gcr.io/cloud-builders/docker
     args:
       - build
       - -t
-      - gcr.io/$PROJECT_ID/friday-v2-bot:$COMMIT_SHA
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-bot:$COMMIT_SHA
       - -f
       - Dockerfile
       - .
@@ -14,17 +26,17 @@ steps:
     args:
       - build
       - -t
-      - gcr.io/$PROJECT_ID/friday-v2-voice:$COMMIT_SHA
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-voice:$COMMIT_SHA
       - -f
       - Dockerfile.voice
       - .
 
   # Push both images
   - name: gcr.io/cloud-builders/docker
-    args: [push, gcr.io/$PROJECT_ID/friday-v2-bot:$COMMIT_SHA]
+    args: [push, asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-bot:$COMMIT_SHA]
 
   - name: gcr.io/cloud-builders/docker
-    args: [push, gcr.io/$PROJECT_ID/friday-v2-voice:$COMMIT_SHA]
+    args: [push, asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-voice:$COMMIT_SHA]
 
   # Deploy Telegram bot + dashboard API to Cloud Run (port 8001)
   - name: gcr.io/cloud-builders/gcloud
@@ -32,7 +44,7 @@ steps:
       - run
       - deploy
       - friday-v2-bot
-      - --image=gcr.io/$PROJECT_ID/friday-v2-bot:$COMMIT_SHA
+      - --image=asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-bot:$COMMIT_SHA
       - --region=asia-southeast1
       - --platform=managed
       - --port=8001
@@ -44,11 +56,11 @@ steps:
       - run
       - deploy
       - friday-v2-voice
-      - --image=gcr.io/$PROJECT_ID/friday-v2-voice:$COMMIT_SHA
+      - --image=asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-voice:$COMMIT_SHA
       - --region=asia-southeast1
       - --platform=managed
       - --no-allow-unauthenticated
 
 images:
-  - gcr.io/$PROJECT_ID/friday-v2-bot:$COMMIT_SHA
-  - gcr.io/$PROJECT_ID/friday-v2-voice:$COMMIT_SHA
+  - asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-bot:$COMMIT_SHA
+  - asia-southeast1-docker.pkg.dev/$PROJECT_ID/friday/friday-v2-voice:$COMMIT_SHA
