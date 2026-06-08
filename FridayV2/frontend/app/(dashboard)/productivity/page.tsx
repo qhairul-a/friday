@@ -9,18 +9,17 @@ import { CSS } from "@dnd-kit/utilities";
 
 const LAYOUT_KEY  = "layout_productivity";
 const SPANS_KEY   = "spans_productivity";
-const HEIGHTS_KEY = "heights_productivity";
+const HEIGHTS_KEY = "heights_productivity_px";
 const NUM_COLS    = 2;
 const GRID_GAP    = 20;
-const ROW_HEIGHT  = 220;
-const MIN_ROWS    = 1;
-const MAX_ROWS    = 6;
+const MIN_HEIGHT  = 120;
+const MAX_HEIGHT  = 1400;
 const DEFAULT_ORDER = ["tasks", "routines", "calendar"];
 const DEFAULT_SPANS: Record<string, number> = { tasks: 1, routines: 1, calendar: 2 };
 const DEFAULT_HEIGHTS: Record<string, number> = {
-  tasks:    2,
-  routines: 2,
-  calendar: 2,
+  tasks:    440,
+  routines: 440,
+  calendar: 440,
 };
 
 interface CalEvent { id: string; title: string; start: string; end: string }
@@ -42,7 +41,8 @@ function SortableWidget({ id, span = 1, height = 1, onResizeStart, onHeightResiz
         transform: CSS.Transform.toString(transform), transition,
         position: "relative",
         gridColumn: `span ${span}`,
-        gridRow: `span ${height}`,
+        height: `${height}px`,
+        alignSelf: "start",
         display: "flex",
         flexDirection: "column",
       }}
@@ -109,6 +109,8 @@ export default function ProductivityPage() {
   const [newTask, setNewTask] = useState({ title: "", due: "", list_id: "" });
   const [newList, setNewList] = useState("");
   const [editingList, setEditingList] = useState<{ id: string; title: string } | null>(null);
+  const [editingTask, setEditingTask] = useState<{ id: string; list_id: string; title: string; due: string } | null>(null);
+  const [hoveredTask, setHoveredTask] = useState<string | null>(null);
   const [newRoutine, setNewRoutine] = useState({ name: "", scheduled_time: "" });
   const today = new Date().toISOString().slice(0, 10);
 
@@ -183,8 +185,7 @@ export default function ProductivityPage() {
     const startY      = e.clientY;
     const startHeight = heights[id] ?? DEFAULT_HEIGHTS[id] ?? 1;
     function onMove(mv: MouseEvent) {
-      const delta = Math.round((mv.clientY - startY) / (ROW_HEIGHT + GRID_GAP));
-      handleHeightChange(id, Math.max(MIN_ROWS, Math.min(MAX_ROWS, startHeight + delta)));
+      handleHeightChange(id, Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, startHeight + (mv.clientY - startY))));
     }
     function onUp() {
       window.removeEventListener("mousemove", onMove);
@@ -233,6 +234,18 @@ export default function ProductivityPage() {
     try {
       await apiFetch("/tasklists", { method: "POST", body: JSON.stringify({ title: newList.trim() }) });
       setNewList(""); loadTaskLists(); loadTasks();
+    } catch (e) { alert(String(e)); }
+  }
+
+  async function saveTask(id: string, list_id: string, title: string, due: string) {
+    if (!title.trim()) return;
+    try {
+      await apiFetch(`/tasks/${id}?list_id=${encodeURIComponent(list_id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title: title.trim(), due: due || undefined }),
+      });
+      setEditingTask(null);
+      loadTasks();
     } catch (e) { alert(String(e)); }
   }
 
@@ -340,18 +353,59 @@ export default function ProductivityPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 200, overflowY: "auto", paddingLeft: 8 }}>
                 {listTasks.length === 0 && <p style={{ color: "var(--text-3)", fontSize: 12 }}>No tasks.</p>}
                 {listTasks.map(t => (
-                  <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <button
-                      onClick={() => apiFetch(`/tasks/${t.id}/complete?list_id=${encodeURIComponent(t.list_id)}`, { method: "POST" }).then(() => loadTasks())}
-                      style={{ width: 18, height: 18, borderRadius: 5, border: "1px solid var(--border-hover)", background: "transparent", cursor: "pointer", flexShrink: 0, transition: "background 0.15s" }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--cyan-dim)"; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-                    />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, color: "var(--text-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</div>
-                      {t.due && <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-3)", marginTop: 1 }}>Due {t.due.slice(0, 10)}</div>}
-                    </div>
-                    <button onClick={() => apiFetch(`/tasks/${t.id}?list_id=${encodeURIComponent(t.list_id)}`, { method: "DELETE" }).then(() => loadTasks())} className="btn-danger">✕</button>
+                  <div
+                    key={t.id}
+                    style={{ display: "flex", alignItems: "center", gap: 12 }}
+                    onMouseEnter={() => setHoveredTask(t.id)}
+                    onMouseLeave={() => setHoveredTask(null)}
+                  >
+                    {editingTask?.id === t.id ? (
+                      <>
+                        <input
+                          autoFocus
+                          value={editingTask.title}
+                          onChange={e => setEditingTask(p => p ? { ...p, title: e.target.value } : p)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") saveTask(t.id, t.list_id, editingTask.title, editingTask.due);
+                            if (e.key === "Escape") setEditingTask(null);
+                          }}
+                          style={{ ...inputStyle, flex: 1, fontSize: 13, padding: "5px 10px" }}
+                          className="cyber-input"
+                        />
+                        <input
+                          type="date"
+                          value={editingTask.due}
+                          onChange={e => setEditingTask(p => p ? { ...p, due: e.target.value } : p)}
+                          style={{ ...inputStyle, width: 130, fontSize: 12, padding: "5px 8px" }}
+                          className="cyber-input"
+                        />
+                        <button onClick={() => saveTask(t.id, t.list_id, editingTask.title, editingTask.due)} className="btn-primary" style={{ fontSize: 12 }}>Save</button>
+                        <button onClick={() => setEditingTask(null)} className="btn-danger" style={{ fontSize: 12 }}>✕</button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => apiFetch(`/tasks/${t.id}/complete?list_id=${encodeURIComponent(t.list_id)}`, { method: "POST" }).then(() => loadTasks())}
+                          style={{ width: 18, height: 18, borderRadius: 5, border: "1px solid var(--border-hover)", background: "transparent", cursor: "pointer", flexShrink: 0, transition: "background 0.15s" }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--cyan-dim)"; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, color: "var(--text-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</div>
+                          {t.due && <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-3)", marginTop: 1 }}>Due {t.due.slice(0, 10)}</div>}
+                        </div>
+                        {hoveredTask === t.id && (
+                          <button
+                            onClick={() => setEditingTask({ id: t.id, list_id: t.list_id, title: t.title, due: t.due?.slice(0, 10) ?? "" })}
+                            title="Edit task"
+                            style={{ background: "transparent", border: "none", color: "var(--text-3)", cursor: "pointer", fontSize: 12, padding: "0 3px", lineHeight: 1, transition: "color 0.15s" }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "var(--cyan)"; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "var(--text-3)"; }}
+                          >✎</button>
+                        )}
+                        <button onClick={() => apiFetch(`/tasks/${t.id}?list_id=${encodeURIComponent(t.list_id)}`, { method: "DELETE" }).then(() => loadTasks())} className="btn-danger">✕</button>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
@@ -431,7 +485,7 @@ export default function ProductivityPage() {
       </div>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={order} strategy={rectSortingStrategy}>
-          <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, gridAutoRows: `${ROW_HEIGHT}px` }}>
+          <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>
             {order.map(id => (
               <SortableWidget
                 key={id}

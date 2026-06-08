@@ -10,7 +10,29 @@ const NAV = [
   { href: "/productivity", label: "Productivity",  icon: "◷" },
   { href: "/finance",      label: "Finance",       icon: "◈" },
   { href: "/fitness",      label: "Fitness",       icon: "♡" },
+  { href: "/notes",        label: "Notes",         icon: "◱" },
 ];
+
+function EyeOpen({ glow }: { glow?: boolean }) {
+  return (
+    <svg width="20" height="14" viewBox="0 0 20 14" fill="none" style={{ display: "block", filter: glow ? "drop-shadow(0 0 4px rgba(34,211,238,0.6))" : undefined }}>
+      <path d="M1 7C4 1.5 16 1.5 19 7C16 12.5 4 12.5 1 7Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+      <circle cx="10" cy="7" r="2.4" stroke="currentColor" strokeWidth="1.2"/>
+      <circle cx="10" cy="7" r="0.8" fill="currentColor"/>
+    </svg>
+  );
+}
+
+function EyeClosed() {
+  return (
+    <svg width="20" height="14" viewBox="0 0 20 14" fill="none" style={{ display: "block" }}>
+      <path d="M1 7C4 1.5 16 1.5 19 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+      <line x1="6.5" y1="6.5" x2="6" y2="9.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+      <line x1="10" y1="6.8" x2="10" y2="10" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+      <line x1="13.5" y1="6.5" x2="14" y2="9.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+    </svg>
+  );
+}
 
 export default function Sidebar({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname();
@@ -114,7 +136,7 @@ export default function Sidebar({ collapsed }: { collapsed: boolean }) {
                   fontFamily: "var(--font-space)",
                 }}
               >
-                {visible ? "◉" : "⊗"}
+                {visible ? <EyeOpen glow /> : <EyeClosed />}
               </button>
               {hoveredHref === "finance-toggle" && <NavTooltip label={visible ? "Hide figures" : "Show figures"} />}
             </div>
@@ -143,26 +165,26 @@ export default function Sidebar({ collapsed }: { collapsed: boolean }) {
             </div>
             <button
               onClick={toggle}
+              title={visible ? "Hide figures" : "Show figures"}
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 6,
+                justifyContent: "center",
                 marginTop: 14,
-                padding: "6px 10px",
-                width: "100%",
+                width: 32,
+                height: 24,
                 background: "transparent",
                 border: `1px solid ${visible ? "rgba(34,211,238,0.5)" : "var(--border)"}`,
                 borderRadius: 8,
                 color: visible ? "var(--cyan)" : "var(--text-3)",
                 cursor: "pointer",
-                fontFamily: "var(--font-space)",
-                fontSize: 12,
-                letterSpacing: "0.01em",
+                fontSize: 13,
+                lineHeight: 1,
                 transition: "border-color 0.2s, color 0.2s",
+                fontFamily: "var(--font-space)",
               }}
             >
-              <span style={{ fontSize: 13, lineHeight: 1 }}>{visible ? "◉" : "⊗"}</span>
-              {visible ? "Hide Figures" : "Show Figures"}
+              {visible ? "◉" : "⊗"}
             </button>
           </>
         )}

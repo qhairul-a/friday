@@ -5,11 +5,11 @@ import {
   LiveKitRoom,
   RoomAudioRenderer,
   useVoiceAssistant,
-  BarVisualizer,
   VoiceAssistantControlBar,
   useLocalParticipant,
   useTrackTranscription,
 } from "@livekit/components-react";
+import FridayOrb from "./FridayOrb";
 import { Track } from "livekit-client";
 
 // ─── Module-scope types and constants ────────────────────────────────────────
@@ -37,7 +37,7 @@ const STATE_LABELS: Record<string, string> = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function PanelContent({ onDisconnect }: { onDisconnect: () => void }) {
-  const { state, audioTrack, agentTranscriptions } = useVoiceAssistant();
+  const { state, agentTranscriptions } = useVoiceAssistant();
   const { localParticipant } = useLocalParticipant();
 
   const stateColor = STATE_COLORS[state] ?? "var(--text-3)";
@@ -50,15 +50,24 @@ function PanelContent({ onDisconnect }: { onDisconnect: () => void }) {
   // useTrackTranscription is @deprecated; migrate to useTranscriptions() when the library ships a replacement that surfaces non-final segments
   const { segments: userSegments } = useTrackTranscription(localMicRef);
 
-  // Build unified turn list
-  const finalTurns: Turn[] = [
-    ...agentTranscriptions
-      .filter(s => s.final)
-      .map(s => ({ id: s.id, from: "friday" as const, text: s.text, startTime: s.startTime })),
-    ...userSegments
-      .filter(s => s.final)
-      .map(s => ({ id: s.id, from: "user" as const, text: s.text, startTime: s.startTime })),
-  ].sort((a, b) => a.startTime - b.startTime);
+  // Accumulate final turns — agentTranscriptions is a rolling buffer and drops old entries
+  const [turnHistory, setTurnHistory] = useState<Turn[]>([]);
+  const seenIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const newFinals: Turn[] = [
+      ...agentTranscriptions
+        .filter(s => s.final && !seenIdsRef.current.has(s.id))
+        .map(s => ({ id: s.id, from: "friday" as const, text: s.text, startTime: s.startTime })),
+      ...userSegments
+        .filter(s => s.final && !seenIdsRef.current.has(s.id))
+        .map(s => ({ id: s.id, from: "user" as const, text: s.text, startTime: s.startTime })),
+    ];
+    if (newFinals.length > 0) {
+      newFinals.forEach(t => seenIdsRef.current.add(t.id));
+      setTurnHistory(prev => [...prev, ...newFinals].sort((a, b) => a.startTime - b.startTime));
+    }
+  }, [agentTranscriptions, userSegments]);
 
   const liveAgentTurn = agentTranscriptions.find(s => !s.final);
   const liveUserTurn  = userSegments.find(s => !s.final);
@@ -66,9 +75,9 @@ function PanelContent({ onDisconnect }: { onDisconnect: () => void }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [finalTurns.length, liveAgentTurn?.text, liveUserTurn?.text]);
+  }, [turnHistory.length, liveAgentTurn?.text, liveUserTurn?.text]);
 
-  const isEmpty = finalTurns.length === 0 && !liveAgentTurn && !liveUserTurn;
+  const isEmpty = turnHistory.length === 0 && !liveAgentTurn && !liveUserTurn;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -97,6 +106,20 @@ function PanelContent({ onDisconnect }: { onDisconnect: () => void }) {
         <button onClick={onDisconnect} className="btn-icon" style={{ fontSize: 11 }}>✕</button>
       </div>
 
+      {/* Orb */}
+      <div style={{
+        height: 180,
+        flexShrink: 0,
+        borderBottom: "1px solid var(--border)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "radial-gradient(ellipse at center, rgba(34,211,238,0.04) 0%, transparent 70%)",
+        overflow: "hidden",
+      }}>
+        <FridayOrb state={state} width={320} height={180} />
+      </div>
+
       {/* Transcript */}
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
         {isEmpty ? (
@@ -105,7 +128,7 @@ function PanelContent({ onDisconnect }: { onDisconnect: () => void }) {
           </p>
         ) : (
           <>
-            {finalTurns.map(turn => (
+            {turnHistory.map(turn => (
               <div key={turn.id} style={{ display: "flex", justifyContent: turn.from === "user" ? "flex-end" : "flex-start" }}>
                 <div style={{
                   maxWidth: "82%",
@@ -183,11 +206,8 @@ function PanelContent({ onDisconnect }: { onDisconnect: () => void }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Visualizer + Controls */}
-      <div style={{ padding: "12px 14px", borderTop: "1px solid var(--border)" }}>
-        <div style={{ height: 36, marginBottom: 8 }}>
-          <BarVisualizer state={state} trackRef={audioTrack} barCount={20} style={{ width: "100%", height: "100%" }} />
-        </div>
+      {/* Controls */}
+      <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)" }}>
         <VoiceAssistantControlBar />
       </div>
     </div>
@@ -269,7 +289,7 @@ export default function VoicePanel() {
             right: 0,
             zIndex: 50,
             width: 320,
-            height: 420,
+            height: 620,
             borderTopLeftRadius: 20,
             borderBottomLeftRadius: 0,
             borderBottomRightRadius: 0,

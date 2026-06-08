@@ -569,9 +569,9 @@ export default function OverviewPage() {
                 return acc;
               }, {});
               return (
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
                   {Object.entries(groups).map(([listName, listTasks]) => (
-                    <div key={listName}>
+                    <div key={listName} style={{ flex: "1 1 160px", minWidth: 140 }}>
                       <div style={{ fontSize: 10, fontWeight: 600, color: "var(--cyan)", fontFamily: "var(--font-space)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>
                         {listName}
                       </div>
