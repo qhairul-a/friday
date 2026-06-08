@@ -11,7 +11,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [collapsed, setCollapsed] = useState(false);
 
   if (isMobile) {
-    return <MobileShell>{children}</MobileShell>;
+    return <MobileShell />;
   }
 
   return (
