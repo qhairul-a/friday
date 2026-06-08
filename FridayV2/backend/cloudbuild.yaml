@@ -13,6 +13,7 @@ steps:
 
   # Build Telegram bot image
   - name: gcr.io/cloud-builders/docker
+    dir: FridayV2/backend
     args:
       - build
       - -t
@@ -23,6 +24,7 @@ steps:
 
   # Build LiveKit voice agent image
   - name: gcr.io/cloud-builders/docker
+    dir: FridayV2/backend
     args:
       - build
       - -t
