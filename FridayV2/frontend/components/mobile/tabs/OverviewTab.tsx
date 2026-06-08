@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
-interface Task  { id: string; title: string; completed: boolean }
-interface Event { id: string; summary: string; start: string }
+interface Task  { id: string; title: string; status: string }
+interface Event { id: string; title: string; start: string }
 
 const card: React.CSSProperties = {
   background: "rgba(255,255,255,0.025)",
@@ -37,11 +37,11 @@ export default function OverviewTab() {
 
   useEffect(() => {
     Promise.all([
-      apiFetch<{ tasks: Task[] }>("/tasks").catch(() => ({ tasks: [] })),
-      apiFetch<{ events: Event[] }>("/calendar/today").catch(() => ({ events: [] })),
+      apiFetch<Task[]>("/tasks").catch(() => [] as Task[]),
+      apiFetch<Event[]>("/calendar?days=1").catch(() => [] as Event[]),
     ]).then(([t, e]) => {
-      setTasks(t.tasks.filter(x => !x.completed).slice(0, 5));
-      setEvents(e.events.slice(0, 3));
+      setTasks(t.filter(x => x.status !== "completed").slice(0, 5));
+      setEvents(e.slice(0, 3));
       setLoading(false);
     });
   }, []);
@@ -73,7 +73,7 @@ export default function OverviewTab() {
               <div key={e.id} style={row}>
                 <span style={{ color: "var(--violet)", fontSize: 11, marginTop: 1 }}>◷</span>
                 <div>
-                  <p style={{ fontSize: 12, color: "var(--text-1)", marginBottom: 2 }}>{e.summary}</p>
+                  <p style={{ fontSize: 12, color: "var(--text-1)", marginBottom: 2 }}>{e.title}</p>
                   <p style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>{e.start}</p>
                 </div>
               </div>

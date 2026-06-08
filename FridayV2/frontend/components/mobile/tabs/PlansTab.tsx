@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
-interface Routine { id: string; name: string; time?: string; completed?: boolean }
+interface Routine { id: string; name: string; scheduled_time?: string; is_done?: boolean }
 
 const card: React.CSSProperties = {
   background: "rgba(255,255,255,0.025)",
@@ -26,8 +26,8 @@ export default function PlansTab() {
   const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
-    apiFetch<{ routines: Routine[] }>("/routines")
-      .then(d => { setRoutines(d.routines ?? []); setLoading(false); })
+    apiFetch<Routine[]>("/routines")
+      .then(d => { setRoutines(d ?? []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
@@ -48,20 +48,20 @@ export default function PlansTab() {
                 borderBottom: "1px solid rgba(255,255,255,0.04)",
               }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span style={{ color: r.completed ? "var(--cyan)" : "var(--text-3)", fontSize: 11 }}>
-                    {r.completed ? "✓" : "○"}
+                  <span style={{ color: r.is_done ? "var(--cyan)" : "var(--text-3)", fontSize: 11 }}>
+                    {r.is_done ? "✓" : "○"}
                   </span>
                   <span style={{
                     fontSize: 12,
-                    color: r.completed ? "var(--text-3)" : "var(--text-2)",
-                    textDecoration: r.completed ? "line-through" : "none",
+                    color: r.is_done ? "var(--text-3)" : "var(--text-2)",
+                    textDecoration: r.is_done ? "line-through" : "none",
                   }}>
                     {r.name}
                   </span>
                 </div>
-                {r.time && (
+                {r.scheduled_time && (
                   <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-3)" }}>
-                    {r.time}
+                    {r.scheduled_time}
                   </span>
                 )}
               </div>

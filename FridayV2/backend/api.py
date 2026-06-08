@@ -576,7 +576,41 @@ def sync_fitness():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/fitness/today")
+def get_fitness_today():
+    try:
+        from integrations.fitness import _read_row, _today
+        row = _read_row(_today())
+        if not row:
+            raise HTTPException(status_code=404, detail="No fitness data for today")
+        return row
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ─── Notes ────────────────────────────────────────────────────────────────────
+
+@app.get("/notes")
+def get_notes(limit: int = 10):
+    try:
+        from integrations.gdrive_notes import _get_service, _get_friday_folder_id, _strip_timestamp
+        service = _get_service()
+        folder_id = _get_friday_folder_id(service)
+        result = service.files().list(
+            q=f"'{folder_id}' in parents and trashed=false",
+            fields="files(id, name, modifiedTime)",
+            orderBy="modifiedTime desc",
+            pageSize=min(limit, 50),
+        ).execute()
+        return [
+            {"id": f["id"], "title": _strip_timestamp(f["name"]), "modified": f["modifiedTime"][:10]}
+            for f in result.get("files", [])
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/notes/tree")
 def get_notes_tree():
