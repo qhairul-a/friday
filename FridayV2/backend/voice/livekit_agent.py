@@ -46,7 +46,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
 
 from livekit import rtc
-from livekit.agents import AgentSession, Agent, function_tool, JobContext, WorkerOptions, cli, room_io, JobExecutorType
+from livekit.agents import AgentSession, Agent, function_tool, JobContext, WorkerOptions, cli, room_io
 from livekit.plugins import deepgram, anthropic
 
 from core.config import settings
@@ -307,20 +307,16 @@ class FridayVoiceAgent(Agent):
 
 
 async def entrypoint(ctx: JobContext):
+    logging.info("[friday] entrypoint started — connecting to room")
     await ctx.connect()
+    logging.info("[friday] connected to LiveKit room")
 
-    # Exit if another Friday agent is already in the room (duplicate-dispatch guard).
-    for participant in ctx.room.remote_participants.values():
-        if participant.kind == rtc.ParticipantKind.PARTICIPANT_KIND_AGENT:
-            print("[friday] Duplicate agent detected — exiting to prevent double-voice.")
-            return
-
-    # Load user memory for the system prompt — 8s timeout so a slow or
-    # unreachable Supabase never blocks the session from starting.
+    # Load user memory — 8s timeout so a slow Supabase never blocks the session.
     try:
         memory_ctx = await asyncio.wait_for(asyncio.to_thread(load_memory), timeout=8.0)
+        logging.info("[friday] memory loaded")
     except Exception as e:
-        print(f"[friday] Warning: load_memory failed or timed out ({e}), continuing without memory.")
+        logging.warning("[friday] load_memory failed or timed out (%s), continuing without memory", e)
         memory_ctx = "(Memory unavailable)"
 
     tz = ZoneInfo(settings.TIMEZONE)
@@ -333,13 +329,12 @@ async def entrypoint(ctx: JobContext):
         )
     )
 
+    logging.info("[friday] building AgentSession")
     session = AgentSession(
         stt=deepgram.STT(api_key=settings.DEEPGRAM_API_KEY, model="nova-2"),
         llm=anthropic.LLM(
             model=settings.FRIDAY_MODEL,
             api_key=settings.ANTHROPIC_API_KEY,
-            # Disable strict JSON schema validation on tool definitions.
-            # Anthropic's API allows max 20 strict tools; Friday has 35+.
             _strict_tool_schema=False,
         ),
         tts=deepgram.TTS(
@@ -348,32 +343,20 @@ async def entrypoint(ctx: JobContext):
         ),
     )
 
-    # Register disconnect handler BEFORE session.start() so a disconnect
-    # during the greeting doesn't miss the event.
-    disconnected = asyncio.Event()
-    ctx.room.on("disconnected", lambda: disconnected.set())
-
-    await session.start(
-        FridayVoiceAgent(instructions),
-        room=ctx.room,
-        # Keep the session alive when the user closes the tab or navigates away.
-        # Without this, every reconnect triggers a new cold-start dispatch and
-        # risks spawning multiple competing agents.
-        room_options=room_io.RoomOptions(close_on_disconnect=False),
-    )
+    logging.info("[friday] starting session")
+    await session.start(FridayVoiceAgent(instructions), room=ctx.room)
+    logging.info("[friday] session started — generating greeting")
 
     try:
         await session.generate_reply(instructions=(
             "Greet Qhairul warmly and with genuine enthusiasm — like you've been looking forward to hearing from him. "
             "Use his name. Keep it to 1–2 sentences. Sound like a close, upbeat assistant, not a customer service bot."
         ))
+        logging.info("[friday] greeting sent")
     except Exception as e:
-        print(f"[friday] Warning: initial greeting failed ({e}). Friday is still listening.")
+        logging.warning("[friday] initial greeting failed (%s) — Friday is still listening", e)
 
-    # Wait until the LiveKit room itself closes before exiting. The agent stays
-    # alive across user reconnections — restart the worker to fully reset.
-    if not disconnected.is_set():
-        await disconnected.wait()
+    await ctx.wait_for_disconnect()
 
 
 if __name__ == "__main__":
@@ -382,5 +365,6 @@ if __name__ == "__main__":
         entrypoint_fnc=entrypoint,
         agent_name="friday-2.0",
         num_idle_processes=0,
-        job_executor_type=JobExecutorType.THREAD,
+        initialize_process_timeout=120.0,
+        load_fnc=lambda: 0.0,
     ))
