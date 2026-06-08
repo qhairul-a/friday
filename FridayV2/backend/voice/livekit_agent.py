@@ -356,7 +356,9 @@ async def entrypoint(ctx: JobContext):
     except Exception as e:
         logging.warning("[friday] initial greeting failed (%s) — Friday is still listening", e)
 
-    await ctx.wait_for_disconnect()
+    disconnected = asyncio.Event()
+    ctx.room.on("disconnected", lambda *_: disconnected.set())
+    await disconnected.wait()
 
 
 if __name__ == "__main__":
