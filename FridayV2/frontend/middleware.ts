@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-const PUBLIC_PATHS = ["/login", "/api/auth", "/manifest.webmanifest", "/sw.js", "/icons/"];
+const PUBLIC_PATHS = ["/login", "/api/auth", "/manifest.webmanifest", "/sw.js", "/icons/", "/mobile-preview"];
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET ?? "friday-jwt-secret-change-this-in-production-32c"
 );

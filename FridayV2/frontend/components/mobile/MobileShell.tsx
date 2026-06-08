@@ -27,98 +27,133 @@ const TABS = [
 
 type TabId = typeof TABS[number]["id"];
 
-const STATE_LABELS: Record<string, string> = {
-  disconnected: "Disconnected", connecting: "Connecting…",
-  listening: "Listening", thinking: "Thinking",
-  speaking: "Speaking", idle: "Idle",
-};
 const STATE_COLORS: Record<string, string> = {
-  listening: "var(--cyan)", thinking: "var(--violet)", speaking: "#fb923c",
+  listening: "var(--cyan)",
+  thinking:  "var(--violet)",
+  speaking:  "#fb923c",
 };
 
-const HEADER_H  = 52;
-const TABBAR_H  = 48;
-const SESSION_H = 64;
+const HEADER_H = 52;
+const TABBAR_H = 48;
 
-// ── Connected orb view — inside LiveKitRoom ───────────────────────────────────
-function ConnectedOrbView() {
+// ── Home orb (connected) — inside LiveKitRoom ─────────────────────────────────
+function ConnectedHomeOrb() {
   const { state } = useVoiceAssistant();
-  const color = STATE_COLORS[state];
   return (
     <div style={{
-      position: "absolute",
-      top: HEADER_H + TABBAR_H, bottom: SESSION_H,
-      left: 0, right: 0,
+      height: "100%",
       display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
-      gap: 16,
-      pointerEvents: "none",
+      gap: 14, pointerEvents: "none",
     }}>
-      <FridayOrb state={state} width={260} height={260} />
+      <FridayOrb state={state} width={240} height={240} />
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <div style={{
           width: 6, height: 6, borderRadius: "50%",
-          background: color ?? "var(--text-3)",
-          boxShadow: color ? `0 0 8px ${color}` : "none",
+          background: STATE_COLORS[state] ?? "var(--text-3)",
+          boxShadow: STATE_COLORS[state] ? `0 0 8px ${STATE_COLORS[state]}` : "none",
         }} />
         <span style={{
           fontFamily: "var(--font-mono)", fontSize: 11,
           letterSpacing: "0.1em", textTransform: "uppercase",
-          color: color ?? "var(--text-3)",
+          color: STATE_COLORS[state] ?? "var(--text-3)",
         }}>
-          {STATE_LABELS[state] ?? state}
+          {state ?? "idle"}
         </span>
       </div>
     </div>
   );
 }
 
-// ── Session bar — inside LiveKitRoom ─────────────────────────────────────────
-function SessionBar({ onDisconnect }: { onDisconnect: () => void }) {
+// ── Session FAB (connected) — inside LiveKitRoom ──────────────────────────────
+function SessionFabConnected({ onDisconnect }: { onDisconnect: () => void }) {
+  const { state }            = useVoiceAssistant();
   const { localParticipant } = useLocalParticipant();
   const micPub  = localParticipant?.getTrackPublication(Track.Source.Microphone);
   const isMuted = micPub?.isMuted ?? false;
+
   function toggleMic() { localParticipant?.setMicrophoneEnabled(isMuted); }
 
+  const stateColor = STATE_COLORS[state] ?? "var(--cyan)";
+
   return (
-    <div style={{
-      position: "fixed", bottom: 0, left: 0, right: 0,
-      height: SESSION_H, zIndex: 30,
-      paddingBottom: "env(safe-area-inset-bottom)",
-      background: "rgba(8,12,28,0.95)",
-      backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
-      borderTop: "1px solid rgba(34,211,238,0.12)",
-      display: "flex", alignItems: "center",
-      justifyContent: "center", gap: 16,
-    }}>
+    <>
+      {/* End-session button — above the main FAB */}
+      <button
+        onClick={onDisconnect}
+        aria-label="End session"
+        style={{
+          position: "fixed", bottom: 96, right: 20, zIndex: 50,
+          width: 36, height: 36, borderRadius: "50%",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(248,113,113,0.1)",
+          border: "1px solid rgba(248,113,113,0.35)",
+          color: "#f87171", fontSize: 14, cursor: "pointer",
+          backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+          transition: "all 0.2s",
+          boxShadow: "0 2px 12px rgba(0,0,0,0.4)",
+        }}
+      >
+        ⏻
+      </button>
+
+      {/* Main FAB — mic toggle + voice state */}
       <button
         onClick={toggleMic}
         aria-label={isMuted ? "Unmute" : "Mute"}
         style={{
-          width: 44, height: 44, borderRadius: "50%",
+          position: "fixed", bottom: 28, right: 20, zIndex: 50,
+          width: 56, height: 56, borderRadius: "50%",
           display: "flex", alignItems: "center", justifyContent: "center",
-          background: isMuted ? "rgba(71,85,105,0.25)" : "rgba(34,211,238,0.12)",
-          border: `1.5px solid ${isMuted ? "rgba(71,85,105,0.5)" : "rgba(34,211,238,0.5)"}`,
-          color: isMuted ? "var(--text-3)" : "var(--cyan)",
-          fontSize: 20, cursor: "pointer", transition: "all 0.2s",
-          boxShadow: isMuted ? "none" : "0 0 16px rgba(34,211,238,0.12)",
+          background: isMuted
+            ? "rgba(71,85,105,0.3)"
+            : `rgba(34,211,238,0.12)`,
+          border: `2px solid ${isMuted ? "rgba(71,85,105,0.5)" : stateColor}`,
+          color: isMuted ? "var(--text-3)" : stateColor,
+          fontSize: 22, cursor: "pointer",
+          backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+          boxShadow: isMuted
+            ? "0 4px 16px rgba(0,0,0,0.4)"
+            : `0 4px 24px ${stateColor}44`,
+          transition: "all 0.2s",
         }}
       >
         {isMuted ? "🔇" : "🎙"}
       </button>
-      <button
-        onClick={onDisconnect}
-        style={{
-          padding: "10px 24px", borderRadius: 100,
-          background: "rgba(248,113,113,0.1)",
-          border: "1px solid rgba(248,113,113,0.3)",
-          color: "#f87171", fontFamily: "var(--font-space)",
-          fontSize: 13, fontWeight: 600, cursor: "pointer",
-        }}
-      >
-        ⏻ End Session
-      </button>
-    </div>
+    </>
+  );
+}
+
+// ── Session FAB (disconnected / connecting) ───────────────────────────────────
+function SessionFabIdle({
+  connecting,
+  onConnect,
+}: {
+  connecting: boolean;
+  onConnect: () => void;
+}) {
+  return (
+    <button
+      onClick={onConnect}
+      disabled={connecting}
+      aria-label="Start session"
+      style={{
+        position: "fixed", bottom: 28, right: 20, zIndex: 50,
+        width: 56, height: 56, borderRadius: "50%",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        background: "rgba(34,211,238,0.08)",
+        border: "2px solid rgba(34,211,238,0.35)",
+        color: connecting ? "var(--text-3)" : "var(--cyan)",
+        fontSize: connecting ? 14 : 22,
+        cursor: connecting ? "not-allowed" : "pointer",
+        backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+        boxShadow: "0 4px 20px rgba(34,211,238,0.12)",
+        transition: "all 0.2s",
+        animation: connecting ? "pulse 1.2s ease-in-out infinite" : "none",
+      }}
+    >
+      {connecting ? "…" : "◎"}
+    </button>
   );
 }
 
@@ -146,7 +181,6 @@ export default function MobileShell() {
 
   const handleDisconnect = useCallback(() => setToken(null), []);
 
-  // Tapping the active tab goes back to orb home
   function handleTabPress(id: TabId) {
     setActiveTab(prev => (prev === id ? null : id));
   }
@@ -167,7 +201,7 @@ export default function MobileShell() {
       {/* Header */}
       <MobileHeader onSettingsPress={() => setSettingsOpen(true)} />
 
-      {/* Tab bar — always visible, no session required */}
+      {/* Top tab bar */}
       <nav style={{
         position: "fixed", top: HEADER_H, left: 0, right: 0,
         height: TABBAR_H, zIndex: 25,
@@ -195,16 +229,10 @@ export default function MobileShell() {
                 WebkitTapHighlightColor: "transparent",
               }}
             >
-              <span style={{
-                fontSize: 16, opacity: active ? 1 : 0.5,
-                fontFamily: "var(--font-space)",
-              }}>
+              <span style={{ fontSize: 16, opacity: active ? 1 : 0.5, fontFamily: "var(--font-space)" }}>
                 {tab.icon}
               </span>
-              <span style={{
-                fontSize: 9, letterSpacing: "0.05em",
-                fontFamily: "var(--font-space)",
-              }}>
+              <span style={{ fontSize: 9, letterSpacing: "0.05em", fontFamily: "var(--font-space)" }}>
                 {tab.label}
               </span>
             </button>
@@ -212,51 +240,34 @@ export default function MobileShell() {
         })}
       </nav>
 
-      {/* Content area */}
+      {/* Content area — full height below tab bar */}
       <div style={{
         position: "absolute",
         top: HEADER_H + TABBAR_H,
-        bottom: token ? SESSION_H : 0,
-        left: 0, right: 0,
+        bottom: 0, left: 0, right: 0,
         overflowY: showHome ? "hidden" : "auto",
         overscrollBehavior: "contain",
       }}>
-        {/* Home — orb + start button (not connected) */}
+        {/* Disconnected home — orb + hint */}
         {showHome && !token && (
           <div style={{
             height: "100%",
             display: "flex", flexDirection: "column",
             alignItems: "center", justifyContent: "center",
-            gap: 20,
+            gap: 12,
           }}>
-            <FridayOrb state="disconnected" width={260} height={260} />
-            {connecting ? (
-              <p style={{
-                fontFamily: "var(--font-mono)", fontSize: 11,
-                color: "var(--text-3)", letterSpacing: "0.08em",
-              }}>
-                Connecting…
-              </p>
-            ) : (
-              <button
-                onClick={handleConnect}
-                style={{
-                  padding: "14px 40px",
-                  background: "linear-gradient(135deg, var(--cyan), var(--violet))",
-                  color: "var(--bg-base)", fontFamily: "var(--font-space)",
-                  fontWeight: 700, fontSize: 15,
-                  border: "none", borderRadius: 100, cursor: "pointer",
-                  boxShadow: "0 4px 24px rgba(34,211,238,0.25)",
-                  transition: "all 0.2s",
-                }}
-              >
-                Start Session
-              </button>
-            )}
+            <FridayOrb state="disconnected" width={240} height={240} />
+            <span style={{
+              fontFamily: "var(--font-mono)", fontSize: 10,
+              color: "var(--text-3)", letterSpacing: "0.1em",
+              textTransform: "uppercase",
+            }}>
+              {connecting ? "Connecting…" : "Tap ◎ to start"}
+            </span>
           </div>
         )}
 
-        {/* Tab content — rendered regardless of session state */}
+        {/* Tab content — always mounted when selected */}
         {activeTab === "overview" && <OverviewTab />}
         {activeTab === "plans"    && <PlansTab />}
         {activeTab === "finance"  && <FinanceTab />}
@@ -264,8 +275,8 @@ export default function MobileShell() {
         {activeTab === "notes"    && <NotesTab />}
       </div>
 
-      {/* LiveKit: connected orb (home only) + session bar */}
-      {token && (
+      {/* LiveKit — connected orb (home only) + connected FAB */}
+      {token ? (
         <LiveKitRoom
           token={token}
           serverUrl={livekitUrl}
@@ -275,15 +286,25 @@ export default function MobileShell() {
           style={{ display: "contents" }}
         >
           <RoomAudioRenderer />
-          {showHome && <ConnectedOrbView />}
-          <SessionBar onDisconnect={handleDisconnect} />
+          {showHome && <ConnectedHomeOrb />}
+          <SessionFabConnected onDisconnect={handleDisconnect} />
         </LiveKitRoom>
+      ) : (
+        <SessionFabIdle connecting={connecting} onConnect={handleConnect} />
       )}
 
       <MobileSettingsSheet
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
       />
+
+      {/* Pulse keyframe for connecting state */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50%       { opacity: 0.6; transform: scale(0.92); }
+        }
+      `}</style>
     </div>
   );
 }
