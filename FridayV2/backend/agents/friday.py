@@ -12,6 +12,7 @@ from agents.productivity_agent import run_productivity_agent
 from agents.research_agent import run_research_agent
 from agents.finance_agent import run_finance_agent
 from agents.fitness_agent import run_fitness_agent
+from agents.navigation_agent import run_navigation_agent
 from integrations.memory import load_memory
 
 _client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
@@ -38,6 +39,7 @@ You have access to sub-agents that handle specialised tasks:
 - **research_agent**: Search the web for information on any topic. Use when the user asks to research, look up, find out about, or search for something online.
 - **finance_agent**: Manage fixed and variable expenses in Google Sheets. Get financial summaries and analytics.
 - **fitness_agent**: Fetch and analyse Garmin fitness metrics. Get health summaries, trends, and coaching advice.
+- **navigation_agent**: Get Google Maps directions to any destination. Use when the user says navigate, directions, how to get to, or similar. Returns a tappable Maps link.
 
 When the user asks you to do something that a sub-agent handles, delegate to it immediately using the tool. After the sub-agent returns a result, summarise it naturally.
 
@@ -138,6 +140,28 @@ TOOLS = [
             "required": ["instruction"],
         },
     },
+    {
+        "name": "navigation_agent",
+        "description": (
+            "Get Google Maps directions to a destination and return a tappable link. "
+            "Use when the user asks to navigate, get directions, or find their way to a place."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "destination": {
+                    "type": "string",
+                    "description": "Place name or address, e.g. 'Marina Bay Sands' or 'Changi Airport T3'",
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": ["driving", "walking", "transit", "bicycling"],
+                    "description": "Travel mode. Defaults to driving.",
+                },
+            },
+            "required": ["destination"],
+        },
+    },
 ]
 
 _AGENT_FNS = {
@@ -146,6 +170,7 @@ _AGENT_FNS = {
     "research_agent": lambda args: run_research_agent(args["query"]),
     "finance_agent": lambda args: run_finance_agent(args["instruction"]),
     "fitness_agent": lambda args: run_fitness_agent(args["instruction"]),
+    "navigation_agent": lambda args: run_navigation_agent(args["destination"], args.get("mode", "driving")),
 }
 
 
