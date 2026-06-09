@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { apiFetch } from "@/lib/api";
 
@@ -40,11 +39,12 @@ function sourceColor(source: string): string {
 }
 
 export default function SettingsPage() {
-  const searchParams = useSearchParams();
-  const [tab, setTab] = useState<Tab>(() => {
-    const t = searchParams?.get("tab");
-    return (t === "overview" || t === "briefings" || t === "memory") ? t : "memory";
-  });
+  const [tab, setTab] = useState<Tab>("memory");
+
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "overview" || t === "briefings" || t === "memory") setTab(t);
+  }, []);
   const [memory, setMemory]   = useState<MemoryRow[]>([]);
   const [editId, setEditId]       = useState<string | null>(null);
   const [editFact, setEditFact]   = useState("");
