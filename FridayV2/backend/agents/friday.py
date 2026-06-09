@@ -3,6 +3,7 @@ Friday — master orchestrator agent for FridayV2.
 Receives user input, routes to sub-agents via tool_use, returns a final response.
 """
 
+import re
 import anthropic
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -175,6 +176,26 @@ TOOLS = [
     },
 ]
 
+# Regex to intercept navigation requests before the LLM sees them.
+# Captures the destination so we can short-circuit directly to navigation_agent.
+_NAV_RE = re.compile(
+    r"(?:navigate|directions?)\s+to\s+(.+)"
+    r"|how\s+(?:do\s+i\s+|to\s+)?get\s+to\s+(.+)"
+    r"|(?:i\s+)?(?:need|want)\s+to\s+go\s+to\s+(.+)"
+    r"|take\s+me\s+to\s+(.+)"
+    r"|(?:get\s+me\s+to)\s+(.+)"
+    r"|(?:route|way|path)\s+to\s+(.+)"
+    r"|heading\s+(?:to|towards?)\s+(.+)",
+    re.IGNORECASE,
+)
+
+def _extract_nav_destination(text: str) -> str | None:
+    m = _NAV_RE.search(text.strip().rstrip("?.!"))
+    if m:
+        return next((g.strip().rstrip("?.!") for g in m.groups() if g), None)
+    return None
+
+
 _AGENT_FNS = {
     "notes_agent": lambda args: run_notes_agent(args["instruction"]),
     "productivity_agent": lambda args: run_productivity_agent(args["instruction"]),
@@ -191,6 +212,25 @@ def run_friday(user_input: str, history: list[dict]) -> tuple[str, list[dict]]:
     history is a list of {"role": "user"|"assistant", "content": str|list} dicts.
     The caller is responsible for maintaining and passing history each turn.
     """
+    # Short-circuit navigation requests — bypass the LLM entirely so it
+    # cannot ask for a starting location or refuse to send the link.
+    dest = _extract_nav_destination(user_input)
+    if dest:
+        # Detect travel mode from the message
+        mode = "driving"
+        if re.search(r"\bwalk(ing)?\b", user_input, re.IGNORECASE):
+            mode = "walking"
+        elif re.search(r"\btransit\b|\bbus\b|\bMRT\b|\btrain\b", user_input, re.IGNORECASE):
+            mode = "transit"
+        elif re.search(r"\bcycl(e|ing)\b|\bbik(e|ing)\b", user_input, re.IGNORECASE):
+            mode = "bicycling"
+        result = run_navigation_agent(dest, mode)
+        updated_history = history + [
+            {"role": "user", "content": user_input},
+            {"role": "assistant", "content": result},
+        ]
+        return result, updated_history
+
     memory = load_memory()
     system = [{"type": "text", "text": _system_prompt(memory), "cache_control": {"type": "ephemeral"}}]
     messages = history + [{"role": "user", "content": user_input}]
