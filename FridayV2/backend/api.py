@@ -608,6 +608,69 @@ def get_weather(lat: float, lon: float):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ─── Briefings ────────────────────────────────────────────────────────────────
+
+from integrations.briefings import (
+    list_briefings, get_briefing, create_briefing, update_briefing, delete_briefing
+)
+
+
+class BriefingCreate(BaseModel):
+    name: str = "New Briefing"
+    send_time: str = "08:00"
+    enabled: bool = True
+    sections: list[str] = []
+
+
+class BriefingUpdate(BaseModel):
+    name: Optional[str] = None
+    send_time: Optional[str] = None
+    enabled: Optional[bool] = None
+    sections: Optional[list[str]] = None
+
+
+@app.get("/briefings")
+def get_briefings():
+    try:
+        return list_briefings()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/briefings")
+async def post_briefing(body: BriefingCreate):
+    try:
+        b = create_briefing(body.name, body.send_time, body.enabled, body.sections)
+        from integrations.telegram_bot import reschedule_briefings
+        await reschedule_briefings()
+        return b
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.patch("/briefings/{briefing_id}")
+async def patch_briefing(briefing_id: str, body: BriefingUpdate):
+    try:
+        fields = {k: v for k, v in body.model_dump().items() if v is not None}
+        b = update_briefing(briefing_id, **fields)
+        from integrations.telegram_bot import reschedule_briefings
+        await reschedule_briefings()
+        return b
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/briefings/{briefing_id}")
+async def del_briefing(briefing_id: str):
+    try:
+        delete_briefing(briefing_id)
+        from integrations.telegram_bot import reschedule_briefings
+        await reschedule_briefings()
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ─── Notes ────────────────────────────────────────────────────────────────────
 
 @app.get("/notes")

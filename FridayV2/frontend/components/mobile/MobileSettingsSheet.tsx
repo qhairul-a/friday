@@ -8,9 +8,10 @@ interface MobileSettingsSheetProps {
 }
 
 const SETTINGS_ITEMS = [
-  { icon: "◈", bg: "rgba(34,211,238,0.08)",   color: "var(--cyan)",   label: "Friday's Memory" },
-  { icon: "⬡", bg: "rgba(167,139,250,0.08)",  color: "var(--violet)", label: "Overview Widgets" },
-  { icon: "◑", bg: "rgba(148,163,184,0.08)",  color: "var(--text-2)", label: "Appearance" },
+  { icon: "◈", bg: "rgba(34,211,238,0.08)",   color: "var(--cyan)",   label: "Friday's Memory",  tab: "memory"    },
+  { icon: "⬡", bg: "rgba(167,139,250,0.08)",  color: "var(--violet)", label: "Overview Widgets", tab: "overview"  },
+  { icon: "◎", bg: "rgba(34,211,238,0.06)",   color: "var(--cyan)",   label: "Briefings",        tab: "briefings" },
+  { icon: "◑", bg: "rgba(148,163,184,0.08)",  color: "var(--text-2)", label: "Appearance",       tab: "appearance"},
 ] as const;
 
 export default function MobileSettingsSheet({ open, onClose }: MobileSettingsSheetProps) {
@@ -79,10 +80,12 @@ export default function MobileSettingsSheet({ open, onClose }: MobileSettingsShe
         {SETTINGS_ITEMS.map(item => (
           <div
             key={item.label}
+            onClick={() => { router.push(`/settings?tab=${item.tab}`); onClose(); }}
             style={{
               display: "flex", alignItems: "center", gap: 12,
               padding: "11px 20px",
               borderBottom: "1px solid rgba(255,255,255,0.04)",
+              cursor: "pointer",
             }}
           >
             <div style={{

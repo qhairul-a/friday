@@ -50,6 +50,8 @@ class Settings(BaseSettings):
 
     # OpenWeather
     OPENWEATHER_API_KEY: str = ""
+    HOME_LAT: float = 1.3521
+    HOME_LON: float = 103.8198
 
     # App
     TIMEZONE: str = "Asia/Singapore"

@@ -32,6 +32,9 @@ logger = logging.getLogger(__name__)
 # Per-user conversation history — keyed by Telegram user ID
 _sessions: dict[int, list[dict]] = {}
 
+# Module-level reference so api.py can trigger reschedules
+_tg_app = None
+
 
 def _get_history(user_id: int) -> list[dict]:
     return _sessions.get(user_id, [])
@@ -141,16 +144,63 @@ async def send_daily_health_push(context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.error("Daily health push failed: %s", e)
 
 
+def _schedule_briefing(job_queue, b: dict) -> None:
+    """Schedule a single enabled briefing in the job queue."""
+    h, m = map(int, b["send_time"].split(":"))
+    bid = b["id"]
+
+    async def _fire(context: ContextTypes.DEFAULT_TYPE) -> None:
+        from integrations.briefings import send_briefing
+        await send_briefing(bid, context.bot)
+
+    job_queue.run_daily(
+        _fire,
+        time=dtime(h, m, tzinfo=ZoneInfo(settings.TIMEZONE)),
+        name=f"briefing_{bid}",
+    )
+
+
+async def reschedule_briefings() -> None:
+    """Remove all briefing jobs and re-add from Supabase. Called after any briefing CRUD."""
+    if _tg_app is None:
+        return
+    for job in _tg_app.job_queue.jobs():
+        if job.name and job.name.startswith("briefing_"):
+            job.schedule_removal()
+    try:
+        from integrations.briefings import list_briefings
+        for b in list_briefings():
+            if b.get("enabled"):
+                _schedule_briefing(_tg_app.job_queue, b)
+        logger.info("Briefings rescheduled: %d active", sum(
+            1 for b in list_briefings() if b.get("enabled")
+        ))
+    except Exception as e:
+        logger.error("reschedule_briefings failed: %s", e)
+
+
 def build_app():
+    global _tg_app
     app = ApplicationBuilder().token(settings.TELEGRAM_BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("clear", clear))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(MessageHandler(filters.VOICE, handle_voice))
 
-    # Daily health push from Garmin
+    # Daily health push from Garmin (unchanged)
     h, m = map(int, settings.GARMIN_DAILY_PUSH_TIME.split(":"))
     push_time = dtime(h, m, tzinfo=ZoneInfo(settings.TIMEZONE))
     app.job_queue.run_daily(send_daily_health_push, time=push_time)
 
+    # Load all enabled briefings from Supabase
+    try:
+        from integrations.briefings import list_briefings
+        for b in list_briefings():
+            if b.get("enabled"):
+                _schedule_briefing(app.job_queue, b)
+        logger.info("Briefings loaded from DB on startup.")
+    except Exception as e:
+        logger.warning("Could not load briefings on startup: %s", e)
+
+    _tg_app = app
     return app

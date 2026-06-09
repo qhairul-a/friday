@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 
 const HIDDEN_KEY = "hidden_overview";
 const OVERVIEW_WIDGETS = [
@@ -11,9 +13,18 @@ const OVERVIEW_WIDGETS = [
   { id: "last_expense",     label: "Last Expense",      icon: "◉" },
 ];
 const CATEGORIES = ["work", "preferences", "hobbies", "health", "personality", "goals", "dislikes", "relationships"];
+const ALL_SECTIONS = [
+  { id: "weather",  icon: "🌤", label: "Weather"  },
+  { id: "calendar", icon: "📅", label: "Calendar" },
+  { id: "tasks",    icon: "✅", label: "Tasks"    },
+  { id: "routines", icon: "🔁", label: "Routines" },
+  { id: "fitness",  icon: "⬡", label: "Fitness"  },
+  { id: "finance",  icon: "💰", label: "Finance"  },
+];
 
 interface MemoryRow { id: string; category: string; fact: string; source: string; updated_at: string }
-type Tab = "memory" | "overview";
+interface Briefing  { id: string; name: string; send_time: string; enabled: boolean; sections: string[] }
+type Tab = "memory" | "overview" | "briefings";
 
 const inputStyle: React.CSSProperties = {
   background: "rgba(7,13,31,0.8)", border: "1px solid var(--border)", borderRadius: 10,
@@ -29,7 +40,11 @@ function sourceColor(source: string): string {
 }
 
 export default function SettingsPage() {
-  const [tab, setTab]         = useState<Tab>("memory");
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = searchParams?.get("tab");
+    return (t === "overview" || t === "briefings" || t === "memory") ? t : "memory";
+  });
   const [memory, setMemory]   = useState<MemoryRow[]>([]);
   const [editId, setEditId]       = useState<string | null>(null);
   const [editFact, setEditFact]   = useState("");
@@ -37,17 +52,24 @@ export default function SettingsPage() {
   const [newFact, setNewFact] = useState({ category: "preferences", fact: "" });
   const [hidden, setHidden]   = useState<string[]>([]);
   const [search, setSearch]   = useState("");
+  const [briefings, setBriefings] = useState<Briefing[]>([]);
+  const [briefingSaving, setBriefingSaving] = useState<string | null>(null);
 
   const loadMemory = useCallback(async () => {
     const { data } = await supabase.from("user_memory").select("*").order("category").order("updated_at", { ascending: false });
     if (data) setMemory(data as MemoryRow[]);
   }, []);
 
+  const loadBriefings = useCallback(async () => {
+    try { setBriefings(await apiFetch<Briefing[]>("/briefings")); } catch { /* offline */ }
+  }, []);
+
   useEffect(() => {
     loadMemory();
+    loadBriefings();
     const s = localStorage.getItem(HIDDEN_KEY);
     if (s) setHidden(JSON.parse(s));
-  }, [loadMemory]);
+  }, [loadMemory, loadBriefings]);
 
   async function deleteFact(id: string) {
     await supabase.from("user_memory").delete().eq("id", id);
@@ -70,6 +92,31 @@ export default function SettingsPage() {
     localStorage.setItem(HIDDEN_KEY, JSON.stringify(next));
   }
 
+  async function patchBriefing(id: string, fields: Partial<Briefing>) {
+    setBriefingSaving(id);
+    try {
+      await apiFetch(`/briefings/${id}`, { method: "PATCH", body: JSON.stringify(fields) });
+      await loadBriefings();
+    } finally { setBriefingSaving(null); }
+  }
+
+  async function addBriefing() {
+    await apiFetch("/briefings", { method: "POST", body: JSON.stringify({ name: "New Briefing", send_time: "08:00", enabled: true, sections: [] }) });
+    await loadBriefings();
+  }
+
+  async function removeBriefing(id: string) {
+    await apiFetch(`/briefings/${id}`, { method: "DELETE" });
+    await loadBriefings();
+  }
+
+  function toggleSection(briefing: Briefing, section: string) {
+    const next = briefing.sections.includes(section)
+      ? briefing.sections.filter(s => s !== section)
+      : [...briefing.sections, section];
+    patchBriefing(briefing.id, { sections: next });
+  }
+
   const filteredMemory = search.trim()
     ? memory.filter(r => r.fact.toLowerCase().includes(search.toLowerCase()))
     : memory;
@@ -89,9 +136,9 @@ export default function SettingsPage() {
 
       {/* Tab bar */}
       <div className="tab-bar" style={{ marginBottom: 32 }}>
-        {(["memory", "overview"] as Tab[]).map(t => (
+        {(["memory", "overview", "briefings"] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)} className={`tab${tab === t ? " active" : ""}`}>
-            {t === "memory" ? "◈ Friday's Memory" : "⬡ Overview Widgets"}
+            {t === "memory" ? "◈ Friday's Memory" : t === "overview" ? "⬡ Overview Widgets" : "◎ Briefings"}
           </button>
         ))}
       </div>
@@ -250,6 +297,110 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
+      {/* ── Briefings Tab ── */}
+      {tab === "briefings" && (
+        <div>
+          <p style={{ color: "var(--text-2)", fontSize: 13, lineHeight: 1.6, marginBottom: 28 }}>
+            Configure scheduled Telegram messages. Each briefing fires at the set time and includes only the sections you enable.
+          </p>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {briefings.map(b => (
+              <div key={b.id} className="glass" style={{ padding: "20px 24px" }}>
+                {/* Header row */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                  {/* Name */}
+                  <input
+                    defaultValue={b.name}
+                    onBlur={e => { if (e.target.value !== b.name) patchBriefing(b.id, { name: e.target.value }); }}
+                    style={{ ...inputStyle, flex: 1, fontSize: 14, fontWeight: 600 }}
+                    className="cyber-input"
+                  />
+                  {/* Time */}
+                  <input
+                    type="time"
+                    defaultValue={b.send_time}
+                    onBlur={e => { if (e.target.value !== b.send_time) patchBriefing(b.id, { send_time: e.target.value }); }}
+                    style={{ ...inputStyle, width: 100, fontFamily: "var(--font-mono)", fontSize: 13, cursor: "pointer" }}
+                    className="cyber-input"
+                  />
+                  {/* Enable toggle */}
+                  <button
+                    onClick={() => patchBriefing(b.id, { enabled: !b.enabled })}
+                    disabled={briefingSaving === b.id}
+                    style={{
+                      position: "relative", width: 44, height: 24, borderRadius: 100,
+                      border: "none", cursor: "pointer", flexShrink: 0,
+                      background: b.enabled ? "var(--cyan)" : "var(--bg-surface)",
+                      boxShadow: b.enabled ? "0 0 12px rgba(34,211,238,0.3)" : "none",
+                      transition: "background 0.2s, box-shadow 0.2s",
+                      opacity: briefingSaving === b.id ? 0.5 : 1,
+                    }}
+                  >
+                    <span style={{
+                      position: "absolute", top: 3,
+                      left: b.enabled ? 22 : 3,
+                      width: 18, height: 18, borderRadius: "50%",
+                      background: b.enabled ? "var(--bg-base)" : "var(--text-3)",
+                      transition: "left 0.2s",
+                    }} />
+                  </button>
+                  {/* Delete */}
+                  <button onClick={() => removeBriefing(b.id)} className="btn-danger" title="Delete briefing">✕</button>
+                </div>
+
+                {/* Sections */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                  {ALL_SECTIONS.map(s => {
+                    const active = b.sections.includes(s.id);
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => toggleSection(b, s.id)}
+                        disabled={briefingSaving === b.id}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 6,
+                          padding: "8px 10px", borderRadius: 8, cursor: "pointer",
+                          border: `1px solid ${active ? "var(--cyan)" : "var(--border)"}`,
+                          background: active ? "rgba(34,211,238,0.08)" : "transparent",
+                          color: active ? "var(--cyan)" : "var(--text-3)",
+                          fontFamily: "var(--font-space)", fontSize: 12,
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        <span style={{ fontSize: 13 }}>{s.icon}</span>
+                        {s.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
+            {briefings.length === 0 && (
+              <div className="glass" style={{ padding: "24px", textAlign: "center" }}>
+                <p style={{ color: "var(--text-3)", fontSize: 13 }}>No briefings yet — add one below.</p>
+              </div>
+            )}
+
+            <button
+              onClick={addBriefing}
+              style={{
+                padding: "12px 0", background: "transparent",
+                border: "1px dashed rgba(34,211,238,0.3)", borderRadius: 12,
+                color: "var(--text-3)", cursor: "pointer", fontSize: 13,
+                fontFamily: "var(--font-space)", width: "100%", transition: "all 0.15s",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "var(--cyan)"; (e.currentTarget as HTMLElement).style.color = "var(--cyan)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(34,211,238,0.3)"; (e.currentTarget as HTMLElement).style.color = "var(--text-3)"; }}
+            >
+              + Add Briefing
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
