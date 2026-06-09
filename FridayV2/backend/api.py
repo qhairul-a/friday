@@ -695,20 +695,38 @@ def get_notes(limit: int = 10):
 
 @app.get("/notes/search")
 def search_notes_endpoint(q: str = ""):
+    """Search the entire vault recursively using 'in ancestors'."""
     try:
-        from integrations.gdrive_notes import _get_service, _get_friday_folder_id, _strip_timestamp
+        from integrations.gdrive_notes import _get_service, _strip_timestamp
+        from core.config import settings as _s
         if not q or len(q.strip()) < 2:
             return []
         service = _get_service()
-        folder_id = _get_friday_folder_id(service)
+
+        # Resolve vault root ID for recursive ancestor search
+        vault_result = service.files().list(
+            q=f"name='{_s.GDRIVE_VAULT_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false",
+            fields="files(id)",
+            pageSize=1,
+        ).execute()
+        vaults = vault_result.get("files", [])
+        if not vaults:
+            return []
+        vault_id = vaults[0]["id"]
+
         keywords = [kw.lower().replace("'", "\\'") for kw in q.split() if len(kw) > 1]
         seen: dict = {}
         for kw in keywords[:3]:
             result = service.files().list(
-                q=f"'{folder_id}' in parents and trashed=false and fullText contains '{kw}'",
-                fields="files(id, name, modifiedTime)",
+                q=(
+                    f"'{vault_id}' in ancestors "
+                    f"and fullText contains '{kw}' "
+                    f"and mimeType != 'application/vnd.google-apps.folder' "
+                    f"and trashed=false"
+                ),
+                fields="files(id, name, modifiedTime, parents)",
                 orderBy="modifiedTime desc",
-                pageSize=20,
+                pageSize=30,
             ).execute()
             for f in result.get("files", []):
                 if f["id"] not in seen:
