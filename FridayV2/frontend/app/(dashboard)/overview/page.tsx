@@ -288,7 +288,7 @@ export default function OverviewPage() {
     setWeatherLoading(true);
     navigator.geolocation.getCurrentPosition(
       pos  => loadWeather(pos.coords.latitude, pos.coords.longitude),
-      ()   => loadWeather(3.1390, 101.6869),   // fallback: Kuala Lumpur
+      ()   => loadWeather(1.3521, 103.8198),   // fallback: Singapore
     );
   }
 
