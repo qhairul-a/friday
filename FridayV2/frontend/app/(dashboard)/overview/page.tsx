@@ -229,10 +229,15 @@ export default function OverviewPage() {
     const h  = localStorage.getItem(HIDDEN_KEY);
     const s  = localStorage.getItem(SPANS_KEY);
     const ht = localStorage.getItem(HEIGHTS_KEY);
-    if (o)  setOrder(JSON.parse(o));
+    if (o) {
+      const stored: string[] = JSON.parse(o);
+      // Append any widgets added to DEFAULT_ORDER after the user saved their layout
+      const newWidgets = DEFAULT_ORDER.filter(id => !stored.includes(id));
+      setOrder(newWidgets.length ? [...stored, ...newWidgets] : stored);
+    }
     if (h)  setHidden(JSON.parse(h));
-    if (s)  setSpans(JSON.parse(s));
-    if (ht) setHeights(JSON.parse(ht));
+    if (s)  setSpans({ ...DEFAULT_SPANS, ...JSON.parse(s) });
+    if (ht) setHeights({ ...DEFAULT_HEIGHTS, ...JSON.parse(ht) });
   }, []);
 
   // 1-second tick for live clocks
