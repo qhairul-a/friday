@@ -87,6 +87,13 @@ Capabilities:
 - Finance: list/add/edit/delete fixed and variable expenses; get financial summary with trends.
 - Fitness: today's health snapshot (steps, sleep, HRV, body battery, stress); weekly trends; recent workouts.
 - Web search: search the web for current events, news, facts, or any question. Always use this for anything outside your knowledge — never refuse.
+- Navigation: get Google Maps directions to any destination — sends a tappable link to Telegram.
+
+Navigation rules (never break these):
+- Trigger on ANY of: "navigate to", "directions to", "how do I get to", "I want/need to get/go to", "take me to", "way to", "route to", "heading to". Call tool_get_directions immediately.
+- NEVER ask for the user's starting location, current location, or GPS. You do not need it.
+- NEVER say you lack location access. Just call the tool with the destination name.
+- The tool sends the link to Telegram automatically — tell the user to check their Telegram.
 
 Finance rules:
 - Variable expenses come from Google Sheets (use list_variable_expenses or get_financial_summary).
@@ -304,6 +311,27 @@ class FridayVoiceAgent(Agent):
     async def tool_get_recent_workouts(self, count: int = 5) -> str:
         """Get the last N workouts from Garmin."""
         return await asyncio.to_thread(get_recent_activities, count)
+
+    # ── Navigation ─────────────────────────────────────────────────────────────
+
+    @function_tool
+    async def tool_get_directions(self, destination: str, mode: str = "driving") -> str:
+        """Get Google Maps directions to a destination and send the link to Telegram.
+        mode: driving | walking | transit | bicycling. No location data needed."""
+        import urllib.parse
+        import requests as _req
+        encoded = urllib.parse.quote_plus(destination)
+        url = f"https://www.google.com/maps/dir/?api=1&destination={encoded}&travelmode={mode}"
+        msg = f"📍 {mode.title()} directions to {destination}:\n{url}"
+        try:
+            _req.post(
+                f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage",
+                json={"chat_id": settings.TELEGRAM_USER_ID, "text": msg},
+                timeout=5,
+            )
+        except Exception:
+            pass
+        return f"Done — I've sent the Google Maps link for {destination} to your Telegram."
 
 
 async def entrypoint(ctx: JobContext):
