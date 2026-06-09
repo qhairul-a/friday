@@ -200,6 +200,7 @@ export default function OverviewPage() {
   const gridRef                   = useRef<HTMLDivElement>(null);
   const [weather, setWeather]         = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherError, setWeatherError]     = useState<string | null>(null);
   const [fitness, setFitness]     = useState<Record<string, number | null> | null>(null);
   const [events, setEvents]       = useState<CalEvent[]>([]);
   const [tasks, setTasks]         = useState<Task[]>([]);
@@ -275,16 +276,22 @@ export default function OverviewPage() {
 
   async function loadWeather(lat: number, lon: number) {
     setWeatherLoading(true);
+    setWeatherError(null);
     try {
       const w = await apiFetch<WeatherData>(`/weather?lat=${lat}&lon=${lon}`);
       setWeather(w);
-    } catch { /* silent — widget shows fallback */ } finally {
+    } catch (e) {
+      setWeatherError(e instanceof Error ? e.message : "Failed to load weather");
+    } finally {
       setWeatherLoading(false);
     }
   }
 
   function requestLocation() {
-    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      loadWeather(1.3521, 103.8198);  // fallback: Singapore
+      return;
+    }
     setWeatherLoading(true);
     navigator.geolocation.getCurrentPosition(
       pos  => loadWeather(pos.coords.latitude, pos.coords.longitude),
@@ -707,6 +714,10 @@ export default function OverviewPage() {
       >
         {weatherLoading && !weather ? (
           <p style={{ color: "var(--text-3)", fontSize: 13 }}>Detecting location…</p>
+        ) : weatherError ? (
+          <p style={{ color: "var(--orange)", fontSize: 12, fontFamily: "var(--font-mono)" }}>
+            Error: {weatherError}
+          </p>
         ) : weather ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

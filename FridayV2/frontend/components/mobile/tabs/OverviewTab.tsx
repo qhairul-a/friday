@@ -44,13 +44,17 @@ export default function OverviewTab() {
   const [loading,        setLoading]        = useState(true);
   const [weather,        setWeather]        = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherError,   setWeatherError]   = useState<string | null>(null);
 
   async function loadWeather(lat: number, lon: number) {
     setWeatherLoading(true);
+    setWeatherError(null);
     try {
       const w = await apiFetch<WeatherData>(`/weather?lat=${lat}&lon=${lon}`);
       setWeather(w);
-    } catch { /* silent */ } finally {
+    } catch (e) {
+      setWeatherError(e instanceof Error ? e.message : "Failed to load weather");
+    } finally {
       setWeatherLoading(false);
     }
   }
@@ -100,6 +104,10 @@ export default function OverviewTab() {
       <div style={card}>
         {weatherLoading && !weather ? (
           <p style={{ color: "var(--text-3)", fontSize: 12 }}>Detecting location…</p>
+        ) : weatherError ? (
+          <p style={{ color: "#f97316", fontSize: 11, fontFamily: "var(--font-mono)" }}>
+            Error: {weatherError}
+          </p>
         ) : !weather ? (
           <p style={{ color: "var(--text-3)", fontSize: 12 }}>Tap Locate to load weather</p>
         ) : (
