@@ -729,3 +729,13 @@ def get_notes_tree():
         return list_vault_tree()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/notes/{file_id}")
+def get_note_content(file_id: str):
+    try:
+        from integrations.gdrive_notes import _get_service, _read_file_content
+        service = _get_service()
+        return {"content": _read_file_content(service, file_id)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
