@@ -179,13 +179,16 @@ TOOLS = [
 # Regex to intercept navigation requests before the LLM sees them.
 # Captures the destination so we can short-circuit directly to navigation_agent.
 _NAV_RE = re.compile(
-    r"(?:navigate|directions?)\s+to\s+(.+)"
-    r"|how\s+(?:do\s+i\s+|to\s+)?get\s+to\s+(.+)"
-    r"|(?:i\s+)?(?:need|want)\s+to\s+go\s+to\s+(.+)"
+    r"(?:navigate|navigation|directions?)\s+to\s+(.+)"
+    r"|how\s+(?:do\s+i\s+|to\s+)?(?:get|go)\s+to\s+(.+)"
+    r"|(?:i\s+)?(?:need|want|wanna|trying)\s+to\s+(?:get|go|head|travel)\s+to\s+(.+)"
     r"|take\s+me\s+to\s+(.+)"
-    r"|(?:get\s+me\s+to)\s+(.+)"
+    r"|get\s+me\s+to\s+(.+)"
     r"|(?:route|way|path)\s+to\s+(.+)"
-    r"|heading\s+(?:to|towards?)\s+(.+)",
+    r"|heading\s+(?:to|towards?)\s+(.+)"
+    r"|(?:find|show)\s+(?:me\s+)?(?:the\s+)?(?:directions?|route|way)\s+(?:to\s+)?(.+)"
+    r"|(?:maps?\s+(?:to|for))\s+(.+)"
+    r"|(?:wanna|gonna)\s+(?:get|go|head)\s+to\s+(.+)",
     re.IGNORECASE,
 )
 
