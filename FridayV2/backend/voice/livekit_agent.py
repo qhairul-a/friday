@@ -8,9 +8,11 @@ import asyncio
 import http.server
 import logging
 import os
+import re
 import socketserver
 import sys
 import threading
+import urllib.parse
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -49,6 +51,8 @@ from livekit import rtc
 from livekit.agents import AgentSession, Agent, function_tool, JobContext, WorkerOptions, cli, room_io
 from livekit.plugins import deepgram, anthropic
 
+import requests as _http
+
 from core.config import settings
 from integrations.gdrive_notes import (
     save_note, list_notes, search_notes, read_note, edit_note, delete_note, search_vault,
@@ -71,6 +75,26 @@ from integrations.finance import (
 )
 from integrations.fitness import get_daily_summary, get_weekly_trends, get_recent_activities
 from integrations.memory import load_memory
+
+
+_NAV_RE = re.compile(
+    r"(?:navigate|navigation|directions?)\s+to\s+(.+)"
+    r"|how\s+(?:do\s+i\s+|to\s+)?(?:get|go)\s+to\s+(.+)"
+    r"|(?:i\s+)?(?:need|want|wanna|trying)\s+to\s+(?:get|go|head|travel)\s+to\s+(.+)"
+    r"|take\s+me\s+to\s+(.+)"
+    r"|get\s+me\s+to\s+(.+)"
+    r"|(?:route|way|path)\s+to\s+(.+)"
+    r"|heading\s+(?:to|towards?)\s+(.+)"
+    r"|(?:find|show)\s+(?:me\s+)?(?:the\s+)?(?:directions?|route|way)\s+(?:to\s+)?(.+)"
+    r"|(?:maps?\s+(?:to|for))\s+(.+)"
+    r"|(?:wanna|gonna)\s+(?:get|go|head)\s+to\s+(.+)",
+    re.IGNORECASE,
+)
+
+
+def _nav_destination(text: str):
+    m = _NAV_RE.search(text.strip().rstrip("?.!"))
+    return next((g.strip().rstrip("?.!") for g in m.groups() if g), None) if m else None
 
 
 VOICE_SYSTEM_PROMPT_BASE = """\
@@ -119,6 +143,35 @@ class FridayVoiceAgent(Agent):
 
     def __init__(self, instructions: str) -> None:
         super().__init__(instructions=instructions)
+
+    async def llm_node(self, chat_ctx, tools, model_settings):
+        """Intercept navigation requests before Haiku sees them."""
+        if chat_ctx.messages:
+            last = chat_ctx.messages[-1]
+            if last.role == "user" and last.text_content:
+                dest = _nav_destination(last.text_content)
+                if dest:
+                    mode = "driving"
+                    t = last.text_content
+                    if re.search(r"\bwalk(ing)?\b", t, re.IGNORECASE):
+                        mode = "walking"
+                    elif re.search(r"\btransit\b|\bbus\b|\bMRT\b|\btrain\b", t, re.IGNORECASE):
+                        mode = "transit"
+                    elif re.search(r"\bcycl(e|ing)\b|\bbik(e|ing)\b", t, re.IGNORECASE):
+                        mode = "bicycling"
+                    encoded = urllib.parse.quote_plus(dest)
+                    url = f"https://www.google.com/maps/dir/?api=1&destination={encoded}&travelmode={mode}"
+                    try:
+                        _http.post(
+                            f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage",
+                            json={"chat_id": settings.TELEGRAM_USER_ID,
+                                  "text": f"📍 {mode.title()} directions to {dest}:\n{url}"},
+                            timeout=5,
+                        )
+                    except Exception:
+                        pass
+                    return f"Done — I've sent the Google Maps {mode} directions for {dest} to your Telegram."
+        return Agent.default.llm_node(self, chat_ctx, tools, model_settings)
 
     # ── Notes ──────────────────────────────────────────────────────────────────
 
