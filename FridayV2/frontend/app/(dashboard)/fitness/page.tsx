@@ -352,7 +352,7 @@ export default function FitnessPage() {
             <Bar dataKey="sleepLight" stackId="sleep" fill="#a855f7" />
             <Bar dataKey="sleepRem"   stackId="sleep" fill="#c084fc" radius={[2, 2, 0, 0]}>
               <LabelList dataKey="sleepTotal" position="top"
-                formatter={(v: number) => v ? `${(v / 60).toFixed(1)}h` : ""}
+                formatter={(v) => { const n = Number(v); return n ? `${(n / 60).toFixed(1)}h` : ""; }}
                 style={{ fill: "var(--text-3)", fontSize: 9, fontFamily: "var(--font-mono)" }}
               />
             </Bar>
