@@ -253,7 +253,7 @@ export default function OverviewPage() {
     try {
       const { data } = await supabase
         .from("fitness_daily")
-        .select("steps,sleep_duration_min,hrv_score")
+        .select("steps,sleep_duration_min,hrv_score,calories")
         .eq("date", today)
         .maybeSingle();
       setFitness(data as Record<string, number | null> | null);
@@ -438,9 +438,10 @@ export default function OverviewPage() {
         {fitness ? (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             {[
-              { label: "Steps", value: fitness.steps?.toLocaleString(),                   unit: "" },
-              { label: "Sleep", value: sleepH !== null ? `${sleepH}h ${sleepM}m` : null, unit: "" },
-              { label: "HRV",   value: fitness.hrv_score,                                unit: "ms" },
+              { label: "Steps",    value: fitness.steps?.toLocaleString(),                   unit: ""    },
+              { label: "Sleep",    value: sleepH !== null ? `${sleepH}h ${sleepM}m` : null, unit: ""    },
+              { label: "HRV",     value: fitness.hrv_score,                                unit: "ms"  },
+              { label: "Calories", value: fitness.calories?.toLocaleString(),               unit: "kcal"},
             ].map(({ label, value, unit }) => (
               <div key={label}>
                 <div className="label" style={{ marginBottom: 4 }}>{label}</div>
