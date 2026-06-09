@@ -695,36 +695,22 @@ def get_notes(limit: int = 10):
 
 @app.get("/notes/search")
 def search_notes_endpoint(q: str = ""):
-    """Search the entire vault recursively using 'in ancestors'."""
+    """Search all .md files in Drive (covers the full Obsidian vault)."""
     try:
         from integrations.gdrive_notes import _get_service, _strip_timestamp
-        from core.config import settings as _s
         if not q or len(q.strip()) < 2:
             return []
         service = _get_service()
-
-        # Resolve vault root ID for recursive ancestor search
-        vault_result = service.files().list(
-            q=f"name='{_s.GDRIVE_VAULT_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false",
-            fields="files(id)",
-            pageSize=1,
-        ).execute()
-        vaults = vault_result.get("files", [])
-        if not vaults:
-            return []
-        vault_id = vaults[0]["id"]
-
-        keywords = [kw.lower().replace("'", "\\'") for kw in q.split() if len(kw) > 1]
+        keywords = [kw.replace("'", "\\'") for kw in q.split() if len(kw) > 1]
         seen: dict = {}
         for kw in keywords[:3]:
             result = service.files().list(
                 q=(
-                    f"'{vault_id}' in ancestors "
+                    f"name contains '.md' "
                     f"and fullText contains '{kw}' "
-                    f"and mimeType != 'application/vnd.google-apps.folder' "
                     f"and trashed=false"
                 ),
-                fields="files(id, name, modifiedTime, parents)",
+                fields="files(id, name, modifiedTime)",
                 orderBy="modifiedTime desc",
                 pageSize=30,
             ).execute()
@@ -732,7 +718,7 @@ def search_notes_endpoint(q: str = ""):
                 if f["id"] not in seen:
                     seen[f["id"]] = {
                         "id": f["id"],
-                        "title": _strip_timestamp(f["name"]),
+                        "title": _strip_timestamp(f["name"].removesuffix(".md")),
                         "modified": f["modifiedTime"][:10],
                     }
         return list(seen.values())
