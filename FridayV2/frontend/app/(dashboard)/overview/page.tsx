@@ -226,7 +226,8 @@ export default function OverviewPage() {
   }, []);
 
   const load = useCallback(async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     // Wrapped in try/catch — if Supabase is unreachable, backend calls must still run
     try {
       const { data } = await supabase

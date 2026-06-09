@@ -579,8 +579,15 @@ def sync_fitness():
 @app.get("/fitness/today")
 def get_fitness_today():
     try:
-        from integrations.fitness import _read_row, _today
-        row = _read_row(_today())
+        from integrations.fitness import sync_today, _read_row, _today
+        today = _today()
+        row = _read_row(today)
+        if not row:
+            try:
+                sync_today()
+                row = _read_row(today)
+            except Exception as sync_err:
+                logger.warning("Auto-sync on /fitness/today failed: %s", sync_err)
         if not row:
             raise HTTPException(status_code=404, detail="No fitness data for today")
         return row

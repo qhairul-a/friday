@@ -3,10 +3,14 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { apiFetch } from "@/lib/api";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, LabelList } from "recharts";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+
+function toLocalDate(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 const LAYOUT_KEY  = "layout_fitness";
 const SPANS_KEY   = "spans_fitness";
@@ -120,6 +124,7 @@ export default function FitnessPage() {
   const [today, setToday] = useState<FitnessRow | null>(null);
   const [history, setHistory] = useState<FitnessRow[]>([]);
   const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [stepView,    setStepView]    = useState<"week" | "month">("week");
   const [monthSteps,  setMonthSteps]  = useState<FitnessRow[]>([]);
   const [monthLoading, setMonthLoading] = useState(false);
@@ -138,17 +143,29 @@ export default function FitnessPage() {
   }, []);
 
   const load = useCallback(async () => {
+    const todayStr = toLocalDate();
     const from = new Date(); from.setDate(from.getDate() - 6);
-    const { data } = await supabase.from("fitness_daily").select("*").gte("date", from.toISOString().slice(0, 10)).order("date", { ascending: true });
-    if (data?.length) { setHistory(data as FitnessRow[]); setToday(data[data.length - 1] as FitnessRow); }
+    const { data } = await supabase.from("fitness_daily").select("*").gte("date", toLocalDate(from)).order("date", { ascending: true });
+    if (data?.length) {
+      setHistory(data as FitnessRow[]);
+      const todayRow = (data as FitnessRow[]).find(r => r.date === todayStr) ?? data[data.length - 1] as FitnessRow;
+      setToday(todayRow);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
   async function sync() {
     setSyncing(true);
-    try { await apiFetch("/fitness/sync", { method: "POST" }); await load(); } catch { /* ignore */ }
-    setSyncing(false);
+    setSyncError(null);
+    try {
+      await apiFetch("/fitness/sync", { method: "POST" });
+      await load();
+    } catch (e) {
+      setSyncError(e instanceof Error ? e.message : "Sync failed");
+    } finally {
+      setSyncing(false);
+    }
   }
 
   async function loadMonthSteps() {
@@ -157,7 +174,7 @@ export default function FitnessPage() {
     try {
       const { data, error } = await supabase.from("fitness_daily")
         .select("date,steps")
-        .gte("date", from.toISOString().slice(0, 10))
+        .gte("date", toLocalDate(from))
         .order("date", { ascending: true });
       if (error) throw error;
       if (data) setMonthSteps(data as FitnessRow[]);
@@ -241,7 +258,9 @@ export default function FitnessPage() {
     sleepDeep:  r.sleep_deep_min,
     sleepLight: r.sleep_light_min,
     sleepRem:   r.sleep_rem_min,
+    sleepTotal: r.sleep_duration_min,
     resting_hr: r.resting_hr,
+    hrv_score:  r.hrv_score,
     stress:     r.stress_avg,
   }));
 
@@ -251,6 +270,10 @@ export default function FitnessPage() {
 
   const hrAvg = chartData.filter(d => d.resting_hr != null).length
     ? Math.round(chartData.reduce((s, d) => s + (d.resting_hr ?? 0), 0) / chartData.filter(d => d.resting_hr != null).length)
+    : null;
+
+  const hrvAvg = chartData.filter(d => d.hrv_score != null).length
+    ? Math.round(chartData.reduce((s, d) => s + (d.hrv_score ?? 0), 0) / chartData.filter(d => d.hrv_score != null).length)
     : null;
 
   const stressAvg = chartData.filter(d => d.stress != null).length
@@ -318,16 +341,21 @@ export default function FitnessPage() {
     ),
     sleep_chart: (
       <div className="glass" style={{ padding: "24px" }}>
-        <div className="label-cyan" style={{ marginBottom: 16 }}>◑ Sleep Duration</div>
+        <div className="label-cyan" style={{ marginBottom: 16 }}>◑ Sleep</div>
         <ResponsiveContainer width="100%" height={160}>
-          <BarChart data={chartData}>
+          <BarChart data={chartData} margin={{ top: 18, right: 0, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="2 6" stroke="rgba(34,211,238,0.06)" />
             <XAxis dataKey="date" tick={{ fill: "var(--text-3)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fill: "var(--text-3)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} width={36} tickFormatter={(v: number) => `${v}m`} />
             <Tooltip contentStyle={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 10, fontFamily: "var(--font-mono)", fontSize: 11 }} />
             <Bar dataKey="sleepDeep"  stackId="sleep" fill="#7c3aed" />
             <Bar dataKey="sleepLight" stackId="sleep" fill="#a855f7" />
-            <Bar dataKey="sleepRem"   stackId="sleep" fill="#c084fc" radius={[2, 2, 0, 0]} />
+            <Bar dataKey="sleepRem"   stackId="sleep" fill="#c084fc" radius={[2, 2, 0, 0]}>
+              <LabelList dataKey="sleepTotal" position="top"
+                formatter={(v: number) => v ? `${(v / 60).toFixed(1)}h` : ""}
+                style={{ fill: "var(--text-3)", fontSize: 9, fontFamily: "var(--font-mono)" }}
+              />
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
         <div style={{ display: "flex", gap: 14, marginTop: 10 }}>
@@ -342,18 +370,34 @@ export default function FitnessPage() {
     ),
     hrv_chart: (
       <div className="glass" style={{ padding: "24px" }}>
-        <div className="label-cyan" style={{ marginBottom: 16 }}>♡ Heart Rate</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div className="label-cyan">◈ HRV</div>
+          <div style={{ display: "flex", gap: 14 }}>
+            {([["#22d3ee", "HRV (ms)"], ["#f87171", "Resting HR (bpm)"]] as const).map(([color, label]) => (
+              <span key={label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "var(--text-3)" }}>
+                <span style={{ width: 18, height: 2, background: color, borderRadius: 2, display: "inline-block" }} />
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
         <ResponsiveContainer width="100%" height={160}>
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="2 6" stroke="rgba(34,211,238,0.06)" />
             <XAxis dataKey="date" tick={{ fill: "var(--text-3)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: "var(--text-3)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} width={36} />
+            <YAxis yAxisId="hrv" orientation="left"  tick={{ fill: "var(--text-3)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} width={32} />
+            <YAxis yAxisId="hr"  orientation="right" tick={{ fill: "var(--text-3)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} width={32} />
             <Tooltip contentStyle={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 10, fontFamily: "var(--font-mono)", fontSize: 11 }} />
-            {hrAvg !== null && (
-              <ReferenceLine y={hrAvg} stroke="rgba(248,113,113,0.4)" strokeDasharray="4 4"
-                label={{ value: "avg", position: "insideTopRight", fill: "rgba(248,113,113,0.6)", fontSize: 8 }} />
+            {hrvAvg !== null && (
+              <ReferenceLine yAxisId="hrv" y={hrvAvg} stroke="rgba(34,211,238,0.35)" strokeDasharray="4 4"
+                label={{ value: "avg", position: "insideTopLeft", fill: "rgba(34,211,238,0.5)", fontSize: 8 }} />
             )}
-            <Line type="monotone" dataKey="resting_hr" stroke="#f87171" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#f87171" }} />
+            {hrAvg !== null && (
+              <ReferenceLine yAxisId="hr" y={hrAvg} stroke="rgba(248,113,113,0.35)" strokeDasharray="4 4"
+                label={{ value: "avg", position: "insideTopRight", fill: "rgba(248,113,113,0.5)", fontSize: 8 }} />
+            )}
+            <Line yAxisId="hrv" type="monotone" dataKey="hrv_score"  stroke="#22d3ee" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#22d3ee" }} />
+            <Line yAxisId="hr"  type="monotone" dataKey="resting_hr" stroke="#f87171" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#f87171" }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -385,9 +429,14 @@ export default function FitnessPage() {
           <div className="label-cyan" style={{ marginBottom: 8 }}>◈ Health Intelligence</div>
           <h1 style={{ fontFamily: "var(--font-space)", fontSize: 32, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text-1)" }}>Fitness</h1>
         </div>
-        <button onClick={sync} disabled={syncing} className="btn-ghost" style={{ marginTop: 8 }}>
-          {syncing ? "Syncing…" : "↻ Sync Garmin"}
-        </button>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+          <button onClick={sync} disabled={syncing} className="btn-ghost" style={{ marginTop: 8 }}>
+            {syncing ? "Syncing…" : "↻ Sync Garmin"}
+          </button>
+          {syncError && (
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#f87171" }}>{syncError}</div>
+          )}
+        </div>
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
