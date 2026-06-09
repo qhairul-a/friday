@@ -597,6 +597,17 @@ def get_fitness_today():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ─── Weather ──────────────────────────────────────────────────────────────────
+
+@app.get("/weather")
+def get_weather(lat: float, lon: float):
+    try:
+        from integrations.weather import fetch_weather
+        return fetch_weather(lat, lon)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ─── Notes ────────────────────────────────────────────────────────────────────
 
 @app.get("/notes")

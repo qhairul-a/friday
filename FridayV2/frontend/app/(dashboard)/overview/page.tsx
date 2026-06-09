@@ -23,11 +23,12 @@ const GRID_GAP    = 20;
 const MIN_HEIGHT  = 120;
 const MAX_HEIGHT  = 1400;
 
-const DEFAULT_ORDER = ["upcoming_events", "world_clock", "tasks_due", "routines", "fitness_snapshot", "last_expense"];
+const DEFAULT_ORDER = ["upcoming_events", "world_clock", "tasks_due", "routines", "fitness_snapshot", "last_expense", "weather"];
 const DEFAULT_SPANS: Record<string, number> = {
   upcoming_events: 4, world_clock: 2,
   tasks_due: 3,       routines: 3,
   fitness_snapshot: 3, last_expense: 3,
+  weather: 3,
 };
 
 const DEFAULT_HEIGHTS: Record<string, number> = {
@@ -37,8 +38,17 @@ const DEFAULT_HEIGHTS: Record<string, number> = {
   routines:         220,
   fitness_snapshot: 220,
   last_expense:     220,
+  weather:          220,
 };
 
+interface WeatherData {
+  city: string; country: string;
+  temp: number; feels_like: number; temp_min: number; temp_max: number;
+  description: string; icon: string;
+  humidity: number; wind_speed: number; wind_dir: string;
+  visibility: number; clouds: number; pressure: number;
+  sunrise: string; sunset: string;
+}
 interface CalEvent   { id: string; title: string; start: string; end?: string }
 interface Task       { id: string; title: string; due: string | null; status: string; list_id?: string; list_title?: string }
 interface VarExpense { date: string; category: string; description: string; amount: string }
@@ -164,14 +174,17 @@ function BottomResizeHandle({ onMouseDown }: { onMouseDown: (e: React.MouseEvent
   )
 }
 
-function Widget({ title, accent = "var(--cyan)", children }: { title: string; accent?: string; children: React.ReactNode }) {
+function Widget({ title, accent = "var(--cyan)", headerRight, children }: { title: string; accent?: string; headerRight?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="glass glow-cyan" style={{
       padding: "24px", position: "relative",
       height: "100%", display: "flex", flexDirection: "column", boxSizing: "border-box",
     }}>
       <div style={{ position: "absolute", top: 0, left: 24, right: 24, height: 1, background: `linear-gradient(90deg, transparent, ${accent}, transparent)`, opacity: 0.6 }} />
-      <div className="label-cyan" style={{ marginBottom: 16 }}>{title}</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div className="label-cyan">{title}</div>
+        {headerRight}
+      </div>
       <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
         {children}
       </div>
@@ -185,6 +198,8 @@ export default function OverviewPage() {
   const [spans, setSpans]         = useState<Record<string, number>>(DEFAULT_SPANS);
   const [heights, setHeights]     = useState<Record<string, number>>(DEFAULT_HEIGHTS);
   const gridRef                   = useRef<HTMLDivElement>(null);
+  const [weather, setWeather]         = useState<WeatherData | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
   const [fitness, setFitness]     = useState<Record<string, number | null> | null>(null);
   const [events, setEvents]       = useState<CalEvent[]>([]);
   const [tasks, setTasks]         = useState<Task[]>([]);
@@ -257,6 +272,27 @@ export default function OverviewPage() {
   }, []);
 
   useEffect(() => { fetchCalendarMonth(viewYear, viewMonth); }, [viewYear, viewMonth, fetchCalendarMonth]);
+
+  async function loadWeather(lat: number, lon: number) {
+    setWeatherLoading(true);
+    try {
+      const w = await apiFetch<WeatherData>(`/weather?lat=${lat}&lon=${lon}`);
+      setWeather(w);
+    } catch { /* silent — widget shows fallback */ } finally {
+      setWeatherLoading(false);
+    }
+  }
+
+  function requestLocation() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    setWeatherLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      pos  => loadWeather(pos.coords.latitude, pos.coords.longitude),
+      ()   => loadWeather(3.1390, 101.6869),   // fallback: Kuala Lumpur
+    );
+  }
+
+  useEffect(() => { requestLocation(); }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -648,6 +684,73 @@ export default function OverviewPage() {
             ))}
           </div>
         ) : <p style={{ color: "var(--text-3)", fontSize: 13 }}>No routines — add some via Friday.</p>}
+      </Widget>
+    ),
+
+    weather: (
+      <Widget
+        title="◑ Weather"
+        headerRight={
+          <button
+            onClick={requestLocation}
+            disabled={weatherLoading}
+            style={{
+              background: "transparent", border: "none", cursor: weatherLoading ? "default" : "pointer",
+              color: "var(--text-3)", fontFamily: "var(--font-mono)", fontSize: 10,
+              letterSpacing: "0.06em", padding: "2px 6px",
+              opacity: weatherLoading ? 0.5 : 1,
+            }}
+          >
+            {weatherLoading ? "…" : "◎ Locate"}
+          </button>
+        }
+      >
+        {weatherLoading && !weather ? (
+          <p style={{ color: "var(--text-3)", fontSize: 13 }}>Detecting location…</p>
+        ) : weather ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 32, lineHeight: 1 }}>{weather.icon}</span>
+              <div>
+                <div style={{ fontFamily: "var(--font-space)", fontSize: 28, fontWeight: 700, color: "var(--text-1)", lineHeight: 1 }}>
+                  {weather.temp}°C
+                </div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
+                  {weather.description}
+                </div>
+              </div>
+              <div style={{ marginLeft: "auto", textAlign: "right" }}>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-2)", fontWeight: 600 }}>
+                  {weather.city}, {weather.country}
+                </div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-3)", marginTop: 2 }}>
+                  H:{weather.temp_max}° · L:{weather.temp_min}°
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px 0", borderTop: "1px solid var(--border)", paddingTop: 8 }}>
+              {[
+                { label: "Feels like", value: `${weather.feels_like}°C` },
+                { label: "Humidity",   value: `${weather.humidity}%` },
+                { label: "Wind",       value: `${weather.wind_speed} km/h ${weather.wind_dir}` },
+                { label: "Visibility", value: `${weather.visibility} km` },
+                { label: "Cloud",      value: `${weather.clouds}%` },
+                { label: "Pressure",   value: `${weather.pressure} hPa` },
+                { label: "Sunrise",    value: weather.sunrise },
+                { label: "Sunset",     value: weather.sunset },
+              ].map(({ label, value }) => (
+                <div key={label}>
+                  <div className="label" style={{ marginBottom: 2, fontSize: 9 }}>{label}</div>
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-1)" }}>{value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p style={{ color: "var(--text-3)", fontSize: 13 }}>
+            Location unavailable — tap <strong>◎ Locate</strong> to try again.
+          </p>
+        )}
       </Widget>
     ),
   };
