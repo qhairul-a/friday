@@ -12,9 +12,9 @@ if [ -n "$GDRIVE_TOKEN_JSON" ]; then
     echo "$GDRIVE_TOKEN_JSON" > /app/secrets/gdrive_token.json
 fi
 
-if [ -n "$GARMIN_TOKEN_JSON" ]; then
+if [ -n "$GARMIN_TOKEN_B64" ]; then
     mkdir -p /app/secrets/garmin_tokens
-    echo "$GARMIN_TOKEN_JSON" > /app/secrets/garmin_tokens/garmin_tokens.json
+    echo "$GARMIN_TOKEN_B64" | base64 -d > /app/secrets/garmin_tokens/garmin_tokens.json
 fi
 
 exec python main.py
