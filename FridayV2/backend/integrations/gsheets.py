@@ -72,7 +72,7 @@ def append_row(spreadsheet_id: str, values: list) -> None:
     _sheets().spreadsheets().values().append(
         spreadsheetId=spreadsheet_id,
         range="A:A",
-        valueInputOption="USER_ENTERED",
+        valueInputOption="RAW",
         body={"values": [values]},
     ).execute()
 
@@ -83,7 +83,7 @@ def update_row(spreadsheet_id: str, row_index: int, values: list) -> None:
     _sheets().spreadsheets().values().update(
         spreadsheetId=spreadsheet_id,
         range=f"A{sheet_row}:Z{sheet_row}",
-        valueInputOption="USER_ENTERED",
+        valueInputOption="RAW",
         body={"values": [values]},
     ).execute()
 

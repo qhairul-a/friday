@@ -33,7 +33,8 @@ app = FastAPI(title="Friday API", version="2.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[],
-    allow_origin_regex=r"(https://.*\.vercel\.app|http://localhost:\d+)",
+    allow_origins=["https://friday-qhairul.vercel.app"],
+    allow_origin_regex=r"http://localhost:\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -102,7 +103,8 @@ def get_calendar(days: int = 7, month: Optional[str] = None):
             })
         return events
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 class CreateEventRequest(BaseModel):
@@ -126,7 +128,8 @@ def create_calendar_event(body: CreateEventRequest):
         created = service.events().insert(calendarId="primary", body=event_body).execute()
         return {"id": created["id"], "title": body.title}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.delete("/calendar/{event_id}")
@@ -136,7 +139,8 @@ def delete_calendar_event(event_id: str):
         service.events().delete(calendarId="primary", eventId=event_id).execute()
         return {"ok": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ─── Tasks ────────────────────────────────────────────────────────────────────
@@ -167,7 +171,8 @@ def get_tasklists():
         result = service.tasklists().list(maxResults=100).execute()
         return [{"id": l["id"], "title": l.get("title", "")} for l in result.get("items", [])]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 class CreateTaskListRequest(BaseModel):
@@ -185,7 +190,8 @@ def create_tasklist(body: CreateTaskListRequest):
         created = service.tasklists().insert(body={"title": body.title}).execute()
         return {"id": created["id"], "title": body.title}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.patch("/tasklists/{list_id}")
@@ -195,7 +201,8 @@ def rename_tasklist(list_id: str, body: RenameTaskListRequest):
         service.tasklists().patch(tasklist=list_id, body={"title": body.title}).execute()
         return {"ok": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.delete("/tasklists/{list_id}")
@@ -205,7 +212,8 @@ def delete_tasklist(list_id: str):
         service.tasklists().delete(tasklist=list_id).execute()
         return {"ok": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/tasks")
@@ -234,7 +242,8 @@ def get_tasks(list_id: Optional[str] = None):
                 })
         return tasks
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 class CreateTaskRequest(BaseModel):
@@ -256,7 +265,8 @@ def create_task(body: CreateTaskRequest):
         created = service.tasks().insert(tasklist=body.list_id, body=task_body).execute()
         return {"id": created["id"], "title": body.title}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 class UpdateTaskRequest(BaseModel):
@@ -281,7 +291,8 @@ def update_task(task_id: str, body: UpdateTaskRequest, list_id: str = "@default"
         service.tasks().update(tasklist=list_id, task=task_id, body=task).execute()
         return {"ok": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.post("/tasks/{task_id}/complete")
@@ -293,7 +304,8 @@ def complete_task(task_id: str, list_id: str = "@default"):
         service.tasks().update(tasklist=list_id, task=task_id, body=task).execute()
         return {"ok": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.delete("/tasks/{task_id}")
@@ -303,7 +315,8 @@ def delete_task(task_id: str, list_id: str = "@default"):
         service.tasks().delete(tasklist=list_id, task=task_id).execute()
         return {"ok": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ─── Finance ──────────────────────────────────────────────────────────────────
@@ -337,7 +350,8 @@ def get_fixed_expenses():
         rows = get_all_rows(_fixed_id())
         return [{"_index": i, **_norm(r)} for i, r in enumerate(rows)]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 class FixedExpenseBody(BaseModel):
@@ -352,7 +366,8 @@ def add_fixed_expense(body: FixedExpenseBody):
         append_row(_fixed_id(), [body.item, str(body.cost), body.comments or ""])
         return {"ok": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.put("/finance/fixed/{row_index}")
@@ -361,7 +376,8 @@ def edit_fixed_expense(row_index: int, body: FixedExpenseBody):
         update_row(_fixed_id(), row_index, [body.item, str(body.cost), body.comments or ""])
         return {"ok": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.delete("/finance/fixed/{row_index}")
@@ -370,7 +386,8 @@ def delete_fixed_expense(row_index: int):
         delete_row(_fixed_id(), row_index)
         return {"ok": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/finance/variable/all")
@@ -379,7 +396,8 @@ def get_all_variable_expenses():
         rows = get_all_rows(_variable_id())
         return [{"_index": i, **_norm(r)} for i, r in enumerate(rows)]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/finance/variable")
@@ -394,7 +412,8 @@ def get_variable_expenses(month: Optional[str] = None):
                 result.append({"_index": i, **norm})
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 class VariableExpenseBody(BaseModel):
@@ -410,7 +429,8 @@ def add_variable_expense(body: VariableExpenseBody):
         append_row(_variable_id(), [body.date, body.category, body.description, "Friday", str(body.amount)])
         return {"ok": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.put("/finance/variable/{row_index}")
@@ -419,7 +439,8 @@ def edit_variable_expense(row_index: int, body: VariableExpenseBody):
         update_row(_variable_id(), row_index, [body.date, body.category, body.description, "Friday", str(body.amount)])
         return {"ok": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.delete("/finance/variable/{row_index}")
@@ -428,7 +449,8 @@ def delete_variable_expense(row_index: int):
         delete_row(_variable_id(), row_index)
         return {"ok": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/finance/summary")
@@ -458,7 +480,8 @@ def get_finance_summary(month: Optional[str] = None):
             "by_category": {k: round(v, 2) for k, v in sorted(by_category.items(), key=lambda x: -x[1])},
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/finance/income")
@@ -466,7 +489,8 @@ def get_income():
     try:
         return {"amount": fetch_income()}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 class IncomeBody(BaseModel):
@@ -481,7 +505,8 @@ def set_income(body: IncomeBody):
         _write_finance_config(cfg)
         return {"ok": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/finance/savings/all")
@@ -490,7 +515,8 @@ def get_all_savings():
         rows = get_all_rows(_savings_id())
         return [{"_index": i, **_norm(r)} for i, r in enumerate(rows)]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/finance/savings")
@@ -505,7 +531,8 @@ def get_savings(month: Optional[str] = None):
                 result.append({"_index": i, **norm})
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.post("/finance/savings")
@@ -514,7 +541,8 @@ def add_saving(body: VariableExpenseBody):
         append_row(_savings_id(), [body.date, body.category, body.description, str(body.amount)])
         return {"ok": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.put("/finance/savings/{row_index}")
@@ -523,7 +551,8 @@ def edit_saving(row_index: int, body: VariableExpenseBody):
         update_row(_savings_id(), row_index, [body.date, body.category, body.description, str(body.amount)])
         return {"ok": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.delete("/finance/savings/{row_index}")
@@ -532,7 +561,8 @@ def delete_saving(row_index: int):
         delete_row(_savings_id(), row_index)
         return {"ok": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ─── Routines ─────────────────────────────────────────────────────────────────
@@ -547,7 +577,8 @@ def get_routines():
         result = get_supabase().table("routines").select("*").order("scheduled_time").execute()
         return _reset_stale(result.data)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.patch("/routines/{routine_id}/toggle")
@@ -561,7 +592,8 @@ def toggle_routine(routine_id: str):
             sb.table("routines").update({"is_done": True, "done_date": date.today().isoformat()}).eq("id", routine_id).execute()
         return {"ok": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ─── Fitness ──────────────────────────────────────────────────────────────────
@@ -573,7 +605,8 @@ def sync_fitness():
         result = sync_today()
         return {"ok": True, "message": result}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/fitness/today")
@@ -594,7 +627,8 @@ def get_fitness_today():
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ─── Weather ──────────────────────────────────────────────────────────────────
@@ -605,7 +639,8 @@ def get_weather(lat: float, lon: float):
         from integrations.weather import fetch_weather
         return fetch_weather(lat, lon)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ─── Briefings ────────────────────────────────────────────────────────────────
@@ -634,7 +669,8 @@ def get_briefings():
     try:
         return list_briefings()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.post("/briefings")
@@ -645,7 +681,8 @@ async def post_briefing(body: BriefingCreate):
         await reschedule_briefings()
         return b
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.patch("/briefings/{briefing_id}")
@@ -657,7 +694,8 @@ async def patch_briefing(briefing_id: str, body: BriefingUpdate):
         await reschedule_briefings()
         return b
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.delete("/briefings/{briefing_id}")
@@ -668,7 +706,8 @@ async def del_briefing(briefing_id: str):
         await reschedule_briefings()
         return {"ok": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ─── Notes ────────────────────────────────────────────────────────────────────
@@ -690,7 +729,8 @@ def get_notes(limit: int = 10):
             for f in result.get("files", [])
         ]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/notes/search")
@@ -723,7 +763,8 @@ def search_notes_endpoint(q: str = ""):
                     }
         return list(seen.values())
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/notes/tree")
@@ -732,7 +773,8 @@ def get_notes_tree():
         from integrations.gdrive_notes import list_vault_tree
         return list_vault_tree()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/notes/{file_id}")
@@ -740,6 +782,12 @@ def get_note_content(file_id: str):
     try:
         from integrations.gdrive_notes import _get_service, _read_file_content
         service = _get_service()
+        meta = service.files().get(fileId=file_id, fields="name").execute()
+        if not meta.get("name", "").endswith(".md"):
+            raise HTTPException(status_code=403, detail="Access denied")
         return {"content": _read_file_content(service, file_id)}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
