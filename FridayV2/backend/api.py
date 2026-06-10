@@ -32,7 +32,6 @@ app = FastAPI(title="Friday API", version="2.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[],
     allow_origins=["https://friday-qhairul.vercel.app"],
     allow_origin_regex=r"http://localhost:\d+",
     allow_credentials=True,
