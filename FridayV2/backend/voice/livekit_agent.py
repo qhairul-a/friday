@@ -146,8 +146,9 @@ class FridayVoiceAgent(Agent):
 
     async def llm_node(self, chat_ctx, tools, model_settings):
         """Intercept navigation requests before Haiku sees them."""
-        if chat_ctx.messages:
-            last = chat_ctx.messages[-1]
+        msgs = chat_ctx.messages()
+        if msgs:
+            last = msgs[-1]
             if last.role == "user" and last.text_content:
                 dest = _nav_destination(last.text_content)
                 if dest:
