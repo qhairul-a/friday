@@ -12,7 +12,6 @@ import logging
 
 import uvicorn
 
-from integrations.telegram_bot import build_app
 from api import app as fastapi_app
 
 logging.basicConfig(
@@ -21,30 +20,11 @@ logging.basicConfig(
 )
 
 
-async def run_telegram():
-    app = build_app()
-    print("Friday is online. Listening on Telegram...")
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling(drop_pending_updates=False)
-    # Keep running until cancelled
-    try:
-        await asyncio.Event().wait()
-    finally:
-        await app.updater.stop()
-        await app.stop()
-        await app.shutdown()
-
-
-async def run_api():
+async def main():
     config = uvicorn.Config(fastapi_app, host="0.0.0.0", port=8001, log_level="warning")
     server = uvicorn.Server(config)
-    print("Dashboard API running on http://localhost:8001")
+    print("Friday is online. Dashboard API on port 8001, Telegram via webhook.")
     await server.serve()
-
-
-async def main():
-    await asyncio.gather(run_telegram(), run_api())
 
 
 if __name__ == "__main__":

@@ -55,6 +55,7 @@ class Settings(BaseSettings):
 
     # App
     TIMEZONE: str = "Asia/Singapore"
+    CLOUD_RUN_URL: str = "https://friday-v2-bot-942269771056.asia-southeast1.run.app"
 
     class Config:
         env_file = BASE_DIR / ".env"

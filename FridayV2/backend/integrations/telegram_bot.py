@@ -181,7 +181,8 @@ async def reschedule_briefings() -> None:
 
 def build_app():
     global _tg_app
-    app = ApplicationBuilder().token(settings.TELEGRAM_BOT_TOKEN).build()
+    # updater(None) disables long-polling — updates arrive via webhook instead
+    app = ApplicationBuilder().token(settings.TELEGRAM_BOT_TOKEN).updater(None).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("clear", clear))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))

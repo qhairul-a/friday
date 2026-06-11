@@ -1,6 +1,5 @@
 """
-FridayV2 REST API — serves the web dashboard.
-Co-runs with the Telegram bot via asyncio in main.py.
+FridayV2 REST API — serves the web dashboard and Telegram webhook.
 Port: 8001
 """
 
@@ -10,14 +9,16 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import logging
+from contextlib import asynccontextmanager
 from calendar import monthrange
 from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from telegram import Update
 
 from core.config import settings
 
@@ -28,7 +29,36 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Friday API", version="2.0")
+# Secret token used to validate incoming Telegram webhook requests
+_WEBHOOK_SECRET = settings.TELEGRAM_BOT_TOKEN.split(":")[1]
+_WEBHOOK_PATH = "/telegram/webhook"
+
+_tg_app = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global _tg_app
+    from integrations.telegram_bot import build_app
+    tg = build_app()
+    await tg.initialize()
+    await tg.start()
+    webhook_url = f"{settings.CLOUD_RUN_URL}{_WEBHOOK_PATH}"
+    await tg.bot.set_webhook(
+        url=webhook_url,
+        secret_token=_WEBHOOK_SECRET,
+        drop_pending_updates=True,
+        allowed_updates=["message"],
+    )
+    logger.info("Telegram webhook registered: %s", webhook_url)
+    _tg_app = tg
+    yield
+    await tg.bot.delete_webhook()
+    await tg.stop()
+    await tg.shutdown()
+
+
+app = FastAPI(title="Friday API", version="2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -45,6 +75,18 @@ app.add_middleware(
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# ─── Telegram Webhook ─────────────────────────────────────────────────────────
+
+@app.post(_WEBHOOK_PATH)
+async def telegram_webhook(request: Request):
+    if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != _WEBHOOK_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    data = await request.json()
+    update = Update.de_json(data, _tg_app.bot)
+    await _tg_app.process_update(update)
+    return {"ok": True}
 
 
 # ─── Calendar ─────────────────────────────────────────────────────────────────
