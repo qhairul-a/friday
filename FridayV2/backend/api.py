@@ -53,7 +53,8 @@ async def lifespan(app: FastAPI):
     logger.info("Telegram webhook registered: %s", webhook_url)
     _tg_app = tg
     yield
-    await tg.bot.delete_webhook()
+    # Do NOT delete webhook on shutdown — the Cloud Run URL is permanent and
+    # deleting it would break message delivery until the next container start.
     await tg.stop()
     await tg.shutdown()
 
