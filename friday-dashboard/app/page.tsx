@@ -639,6 +639,51 @@ function DesktopPanelSlider() {
   );
 }
 
+// ─── Last expense widget (mobile) ────────────────────────────────────────────
+
+interface ExpenseRow {
+  date: string;
+  category: string;
+  description: string;
+  amount: number;
+}
+
+function LastExpenseWidget() {
+  const [expense, setExpense] = useState<ExpenseRow | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from("expenses")
+      .select("date,category,description,amount")
+      .eq("user_id", USER_ID)
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .then(({ data }) => {
+        if (data && data[0]) setExpense(data[0] as ExpenseRow);
+      });
+  }, []);
+
+  if (!expense) return null;
+
+  const fmtDate = (iso: string) =>
+    new Date(iso + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" });
+
+  return (
+    <Widget title="Last Expense" icon="$">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-white truncate">{expense.description}</p>
+          <p className="text-[10px] text-[#4a7a9b] mt-0.5 capitalize">{expense.category} · {fmtDate(expense.date)}</p>
+        </div>
+        <span className="text-sm font-bold text-[#00d4ff] shrink-0">
+          SGD {expense.amount.toFixed(2)}
+        </span>
+      </div>
+    </Widget>
+  );
+}
+
 // ─── Mobile calendar panel (stacked: month view on top, events list below) ────
 
 function MobileCalendarPanel() {
@@ -757,10 +802,11 @@ export default function Dashboard() {
       <MobileSwipePanels
         initialPanel={1}
         panels={[
-          // Panel 0 — Routine + Tasks
+          // Panel 0 — Routine + Tasks + Last Expense
           <div key="productivity" className="px-3 pt-3 pb-24 space-y-3 overflow-y-auto">
             <RoutineWidget />
             <TasksWidget />
+            <LastExpenseWidget />
           </div>,
 
           // Panel 1 — Voice orb (hero, center default)

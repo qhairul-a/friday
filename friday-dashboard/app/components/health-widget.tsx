@@ -118,9 +118,8 @@ export default function HealthWidget() {
   if (en.includes("steps") && m.steps) {
     const pct = m.steps_goal ? ` (${Math.round((m.steps / m.steps_goal) * 100)}%)` : "";
     chips.push({ label: METRIC_LABELS.steps, value: `${m.steps.toLocaleString()}${pct}` });
-  }
-  if (en.includes("distance") && m.distance_km) {
-    chips.push({ label: METRIC_LABELS.distance, value: `${m.distance_km} km` });
+    // Distance always shown next to steps when data is available
+    chips.push({ label: METRIC_LABELS.distance, value: m.distance_km ? `${m.distance_km} km` : "—" });
   }
   if (en.includes("body_battery") && m.body_battery_high != null) {
     chips.push({ label: METRIC_LABELS.body_battery, value: `${m.body_battery_low}–${m.body_battery_high}` });
