@@ -6,6 +6,7 @@ export async function GET() {
     supabase
       .from("fitness_daily")
       .select("date,steps,distance_km,calories,resting_hr,sleep_duration_min,sleep_score,sleep_deep_min,sleep_light_min,sleep_rem_min,hrv_score,body_battery_low,body_battery_high,stress_avg,vo2max")
+      .eq("user_id", USER_ID)
       .order("date", { ascending: false })
       .limit(1)
       .single(),
