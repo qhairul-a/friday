@@ -657,14 +657,17 @@ function LastExpenseWidget() {
       .select("date,category,description,amount")
       .eq("user_id", USER_ID)
       .order("date", { ascending: false })
-      .order("created_at", { ascending: false })
       .limit(1)
-      .then(({ data }) => {
-        if (data && data[0]) setExpense(data[0] as ExpenseRow);
+      .then(({ data, error }) => {
+        if (!error && data && data[0]) setExpense(data[0] as ExpenseRow);
       });
   }, []);
 
-  if (!expense) return null;
+  if (!expense) return (
+    <Widget title="Last Expense" icon="$">
+      <p className="text-xs text-[#4a7a9b]">No expenses recorded.</p>
+    </Widget>
+  );
 
   const fmtDate = (iso: string) =>
     new Date(iso + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" });

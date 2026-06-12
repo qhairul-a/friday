@@ -115,10 +115,9 @@ export default function HealthWidget() {
   const en = data.enabled;
   const chips: { label: string; value: string }[] = [];
 
-  if (en.includes("steps") && m.steps) {
+  if (m.steps) {
     const pct = m.steps_goal ? ` (${Math.round((m.steps / m.steps_goal) * 100)}%)` : "";
     chips.push({ label: METRIC_LABELS.steps, value: `${m.steps.toLocaleString()}${pct}` });
-    // Distance always shown next to steps when data is available
     chips.push({ label: METRIC_LABELS.distance, value: m.distance_km ? `${m.distance_km} km` : "—" });
   }
   if (en.includes("body_battery") && m.body_battery_high != null) {
