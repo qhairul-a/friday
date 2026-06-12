@@ -47,7 +47,6 @@ def sync_today() -> str:
 
     row = {
         "date": date,
-        "user_id": "default",
         "steps": _to_int(stats.get("steps")),
         "active_minutes": _to_int(stats.get("active_minutes")),
         "calories": _to_int(stats.get("calories")),
