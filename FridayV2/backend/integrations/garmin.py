@@ -57,14 +57,16 @@ def _safe(fn, *args, **kwargs):
 
 
 def fetch_daily_stats(date: str) -> dict:
-    """Return steps, active_minutes, calories for the given YYYY-MM-DD date."""
+    """Return steps, active_minutes, calories, distance_km for the given YYYY-MM-DD date."""
     raw = _safe(_client().get_stats, date)
     if not raw:
         return {}
+    distance_m = raw.get("totalDistanceMeters")
     return {
         "steps": raw.get("totalSteps"),
         "active_minutes": raw.get("highlyActiveSeconds", 0) // 60 + raw.get("activeSeconds", 0) // 60,
         "calories": raw.get("totalKilocalories"),
+        "distance_km": round(distance_m / 1000, 2) if distance_m else None,
     }
 
 

@@ -50,6 +50,7 @@ def sync_today() -> str:
         "steps": _to_int(stats.get("steps")),
         "active_minutes": _to_int(stats.get("active_minutes")),
         "calories": _to_int(stats.get("calories")),
+        "distance_km": stats.get("distance_km"),
         "resting_hr": _to_int(rhr.get("resting_hr")),
         "sleep_duration_min": _to_int(sleep.get("duration_min")),
         "sleep_score": _to_int(sleep.get("score")),
