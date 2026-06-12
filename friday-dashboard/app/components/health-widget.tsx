@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCachedFetch } from "@/lib/use-cached-fetch";
 import Link from "next/link";
 
 interface HealthMetrics {
@@ -71,14 +71,7 @@ function MetricChip({ label, value }: { label: string; value: string }) {
 }
 
 export default function HealthWidget() {
-  const [data, setData] = useState<HealthResponse | null>(null);
-
-  useEffect(() => {
-    fetch("/api/health")
-      .then((r) => r.json())
-      .then(setData)
-      .catch(() => {});
-  }, []);
+  const { data } = useCachedFetch<HealthResponse>("/api/health", 60_000);
 
   if (!data) {
     return (

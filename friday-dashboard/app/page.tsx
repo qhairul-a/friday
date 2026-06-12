@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase, USER_ID } from "@/lib/supabase";
+import { useCachedFetch } from "@/lib/use-cached-fetch";
 import { Task, RoutineItem, Goal } from "@/lib/types";
 import PageShell from "./components/page-shell";
 import VoiceOrb from "./components/voice-orb";
@@ -340,19 +341,7 @@ function MonthCalendar({ events, fullWidth = false }: { events: CalendarEvent[];
 }
 
 function CalendarWidget() {
-  const [events, setEvents] = useState<CalendarEvent[] | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-
-  function load() {
-    setRefreshing(true);
-    fetch(`/api/calendar?_t=${Date.now()}`)
-      .then((r) => r.json())
-      .then((data: CalendarEvent[]) => setEvents(data))
-      .catch(() => setEvents([]))
-      .finally(() => setRefreshing(false));
-  }
-
-  useEffect(() => { load(); }, []);
+  const { data: events, loading: refreshing, refresh: load } = useCachedFetch<CalendarEvent[]>("/api/calendar", 60_000);
 
   return (
     <Widget title="Calendar" icon="◈" action={
