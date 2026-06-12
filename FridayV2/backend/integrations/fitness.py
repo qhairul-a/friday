@@ -45,35 +45,38 @@ def sync_today() -> str:
 
     logger.info("sync_today fetch results — rhr=%s  hrv=%s  vo2=%s", rhr, hrv, vo2)
 
+    def _to_hrs(mins) -> float | None:
+        return round(int(mins) / 60, 2) if mins is not None else None
+
     row = {
+        "user_id": "default",
         "date": date,
         "steps": _to_int(stats.get("steps")),
         "active_minutes": _to_int(stats.get("active_minutes")),
-        "calories": _to_int(stats.get("calories")),
+        "calories_active": _to_int(stats.get("calories")),
         "distance_km": stats.get("distance_km"),
-        "resting_hr": _to_int(rhr.get("resting_hr")),
-        "sleep_duration_min": _to_int(sleep.get("duration_min")),
+        "heart_rate_resting": _to_int(rhr.get("resting_hr")),
+        "sleep_duration_hrs": _to_hrs(sleep.get("duration_min")),
         "sleep_score": _to_int(sleep.get("score")),
-        "sleep_deep_min": _to_int(sleep.get("deep_min")),
-        "sleep_light_min": _to_int(sleep.get("light_min")),
-        "sleep_rem_min": _to_int(sleep.get("rem_min")),
-        "hrv_score": _to_int(hrv.get("hrv_score")),
-        "hrv_status": hrv.get("hrv_status"),
+        "sleep_deep_hrs": _to_hrs(sleep.get("deep_min")),
+        "sleep_light_hrs": _to_hrs(sleep.get("light_min")),
+        "sleep_rem_hrs": _to_hrs(sleep.get("rem_min")),
+        "hrv_weekly_avg": hrv.get("hrv_score"),
         "body_battery_low": _to_int(battery.get("body_battery_low")),
         "body_battery_high": _to_int(battery.get("body_battery_high")),
         "stress_avg": _to_int(stress.get("stress_avg")),
-        "vo2max": vo2,
+        "vo2_max": vo2,
     }
 
     try:
-        supabase.table("fitness_daily").upsert(row, on_conflict="date").execute()
+        supabase.table("health_metrics").upsert(row, on_conflict="user_id,date").execute()
     except Exception as e:
         raise RuntimeError(f"Supabase upsert failed: {e}") from e
     return f"Synced fitness data for {date}."
 
 
 def _read_row(date: str) -> dict | None:
-    result = supabase.table("fitness_daily").select("*").eq("date", date).execute()
+    result = supabase.table("health_metrics").select("*").eq("user_id", "default").eq("date", date).execute()
     rows = result.data
     return rows[0] if rows else None
 
@@ -94,21 +97,22 @@ def get_daily_summary(date: str | None = None) -> str:
         lines.append(f"Steps: {row['steps']:,}")
     if row.get("active_minutes") is not None:
         lines.append(f"Active minutes: {row['active_minutes']} min")
-    if row.get("calories") is not None:
-        lines.append(f"Calories burned: {row['calories']} kcal")
-    if row.get("resting_hr") is not None:
-        lines.append(f"Resting HR: {row['resting_hr']} bpm")
+    if row.get("calories_active") is not None:
+        lines.append(f"Calories burned: {row['calories_active']} kcal")
+    if row.get("heart_rate_resting") is not None:
+        lines.append(f"Resting HR: {row['heart_rate_resting']} bpm")
 
-    if row.get("sleep_duration_min") is not None:
-        h, m = divmod(row["sleep_duration_min"], 60)
+    if row.get("sleep_duration_hrs") is not None:
+        hrs = float(row["sleep_duration_hrs"])
+        h = int(hrs); m = round((hrs % 1) * 60)
         score = f" (score: {row['sleep_score']})" if row.get("sleep_score") else ""
         lines.append(f"Sleep: {h}h {m}m{score}")
-        if row.get("sleep_deep_min") is not None:
-            lines.append(f"  Deep: {row['sleep_deep_min']}m  Light: {row.get('sleep_light_min', '?')}m  REM: {row.get('sleep_rem_min', '?')}m")
+        if row.get("sleep_deep_hrs") is not None:
+            deep = float(row["sleep_deep_hrs"]); rem = float(row.get("sleep_rem_hrs") or 0)
+            lines.append(f"  Deep: {deep:.1f}h  REM: {rem:.1f}h")
 
-    if row.get("hrv_score") is not None:
-        status = f" ({row['hrv_status']})" if row.get("hrv_status") else ""
-        lines.append(f"HRV: {row['hrv_score']} ms{status}")
+    if row.get("hrv_weekly_avg") is not None:
+        lines.append(f"HRV: {row['hrv_weekly_avg']} ms")
 
     if row.get("body_battery_low") is not None:
         lines.append(f"Body Battery: {row['body_battery_low']}–{row['body_battery_high']}")
@@ -116,8 +120,8 @@ def get_daily_summary(date: str | None = None) -> str:
     if row.get("stress_avg") is not None:
         lines.append(f"Avg stress: {row['stress_avg']}")
 
-    if row.get("vo2max") is not None:
-        lines.append(f"VO2 max: {row['vo2max']:.1f}")
+    if row.get("vo2_max") is not None:
+        lines.append(f"VO2 max: {float(row['vo2_max']):.1f}")
 
     return "\n".join(lines)
 
@@ -127,7 +131,7 @@ def get_weekly_trends(n_days: int = 7) -> str:
     today = datetime.strptime(_today(), "%Y-%m-%d")
     start = (today - timedelta(days=n_days - 1)).strftime("%Y-%m-%d")
 
-    result = supabase.table("fitness_daily").select("*").gte("date", start).order("date").execute()
+    result = supabase.table("health_metrics").select("*").eq("user_id", "default").gte("date", start).order("date").execute()
     rows = result.data
 
     if not rows:
@@ -144,30 +148,30 @@ def get_weekly_trends(n_days: int = 7) -> str:
         lines.append(f"Avg steps:           {int(avg('steps')):,}/day")
     if avg("active_minutes") is not None:
         lines.append(f"Avg active minutes:  {avg('active_minutes')} min/day")
-    if avg("sleep_duration_min") is not None:
-        total = avg("sleep_duration_min")
-        h, m = divmod(int(total), 60)
+    if avg("sleep_duration_hrs") is not None:
+        total = avg("sleep_duration_hrs")
+        h = int(total); m = round((total % 1) * 60)
         score = f"  avg score: {avg('sleep_score')}" if avg("sleep_score") else ""
         lines.append(f"Avg sleep:           {h}h {m}m{score}")
-    if avg("hrv_score") is not None:
-        lines.append(f"Avg HRV:             {avg('hrv_score')} ms")
+    if avg("hrv_weekly_avg") is not None:
+        lines.append(f"Avg HRV:             {avg('hrv_weekly_avg')} ms")
     if avg("body_battery_high") is not None:
         lines.append(f"Avg body battery:    {avg('body_battery_low')}–{avg('body_battery_high')} (low–high)")
     if avg("stress_avg") is not None:
         lines.append(f"Avg stress:          {avg('stress_avg')}")
-    if avg("resting_hr") is not None:
-        lines.append(f"Avg resting HR:      {avg('resting_hr')} bpm")
+    if avg("heart_rate_resting") is not None:
+        lines.append(f"Avg resting HR:      {avg('heart_rate_resting')} bpm")
 
     lines.append("\nDay-by-day:")
     for r in rows:
         parts = [r["date"]]
         if r.get("steps") is not None:
             parts.append(f"{r['steps']:,} steps")
-        if r.get("sleep_duration_min") is not None:
-            h, m = divmod(r["sleep_duration_min"], 60)
+        if r.get("sleep_duration_hrs") is not None:
+            hrs = float(r["sleep_duration_hrs"]); h = int(hrs); m = round((hrs % 1) * 60)
             parts.append(f"sleep {h}h{m}m")
-        if r.get("hrv_score") is not None:
-            parts.append(f"HRV {r['hrv_score']}")
+        if r.get("hrv_weekly_avg") is not None:
+            parts.append(f"HRV {r['hrv_weekly_avg']}")
         if r.get("body_battery_high") is not None:
             parts.append(f"BB {r['body_battery_low']}–{r['body_battery_high']}")
         lines.append("  " + " | ".join(parts))
