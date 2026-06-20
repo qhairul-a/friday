@@ -714,6 +714,20 @@ def garmin_status():
     return {"connected": has_local or has_supabase}
 
 
+# ─── Finance ──────────────────────────────────────────────────────────────────
+
+@app.get("/finance/last-expense")
+def finance_last_expense():
+    """Return the most recent variable expense from Google Sheets."""
+    try:
+        from integrations.finance import get_last_variable_expense
+        expense = get_last_variable_expense()
+        return {"expense": expense}
+    except Exception as e:
+        logger.error("finance/last-expense error: %s", e)
+        return {"expense": None}
+
+
 # ─── Weather ──────────────────────────────────────────────────────────────────
 
 @app.get("/weather")

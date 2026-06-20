@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase, USER_ID } from "@/lib/supabase";
 import { useCachedFetch } from "@/lib/use-cached-fetch";
-import { Task, RoutineItem, Goal } from "@/lib/types";
+import type { GoogleTask } from "./api/google-tasks/route";
+import { RoutineItem, Goal } from "@/lib/types";
 import PageShell from "./components/page-shell";
 import VoiceOrb from "./components/voice-orb";
 import MobileSwipePanels from "./components/mobile-swipe-panels";
@@ -12,8 +13,18 @@ import MobileBottomNav from "./components/mobile-bottom-nav";
 import { HealthAnalyticsPanel } from "./components/health-charts";
 import HealthWidget from "./components/health-widget";
 
-const PRIORITY_WEIGHT = { high: 3, normal: 2, low: 1 } as const;
-const STATUS_WEIGHT = { in_progress: 2, todo: 1, done: 0, archived: 0 } as const;
+function formatTaskDue(due: string | null): string {
+  if (!due) return "";
+  const d = new Date(due + "T00:00:00");
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  if (sameDay(d, today))    return "Today";
+  if (sameDay(d, tomorrow)) return "Tomorrow";
+  return d.toLocaleDateString("en-SG", { day: "numeric", month: "short" });
+}
 
 // ─── Widget wrapper ───────────────────────────────────────────────────────────
 
@@ -394,39 +405,25 @@ function CalendarWidget() {
 
 // ─── Tasks widget ─────────────────────────────────────────────────────────────
 
-const PRIORITY_DOT: Record<Task["priority"], string> = {
-  high: "bg-red-400", normal: "bg-[#00d4ff]", low: "bg-[#1a3a5c]",
-};
-
 function TasksWidget() {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<GoogleTask[]>([]);
   const [loading, setLoading] = useState(true);
 
-  function fetchTasks() {
-    return supabase.from("tasks").select("*").eq("user_id", USER_ID)
-      .in("status", ["in_progress", "todo"]).order("created_at", { ascending: true })
-      .then(({ data }) => {
-        const sorted = ((data as Task[]) ?? []).sort((a, b) => {
-          const sd = STATUS_WEIGHT[b.status] - STATUS_WEIGHT[a.status];
-          return sd !== 0 ? sd : PRIORITY_WEIGHT[b.priority] - PRIORITY_WEIGHT[a.priority];
-        });
-        setTasks(sorted.slice(0, 8));
-        setLoading(false);
-      });
-  }
-
   useEffect(() => {
-    fetchTasks();
-    const channel = supabase.channel("tasks_changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${USER_ID}` }, () => fetchTasks())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetch("/api/google-tasks")
+      .then(r => r.json())
+      .then((data: GoogleTask[]) => {
+        if (Array.isArray(data)) {
+          setTasks(data.filter(t => !t.completed).slice(0, 8));
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   return (
     <Widget title="Tasks" icon="✓" action={
-      <Link href="/tasks" className="text-[10px] text-[#00d4ff] hover:text-white transition-colors">View all →</Link>
+      <Link href="/things-to-do" className="text-[10px] text-[#00d4ff] hover:text-white transition-colors">View all →</Link>
     }>
       {loading ? <div className="text-[#4a7a9b] text-xs">Loading…</div>
         : tasks.length === 0 ? <div className="text-[#4a7a9b] text-[11px] text-center py-1">No open tasks</div>
@@ -434,9 +431,9 @@ function TasksWidget() {
           <div className="flex flex-col gap-1.5">
             {tasks.map(t => (
               <div key={t.id} className="flex items-center gap-2 bg-[#060e1c] rounded-lg px-2.5 py-1.5">
-                <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${PRIORITY_DOT[t.priority]}`} />
+                <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-[#00d4ff]" />
                 <span className="text-[11px] text-white truncate flex-1">{t.title}</span>
-                {t.status === "in_progress" && <span className="text-[9px] text-yellow-500 shrink-0">Active</span>}
+                {t.due && <span className="text-[9px] text-[#4a7a9b] shrink-0">{formatTaskDue(t.due)}</span>}
               </div>
             ))}
           </div>
@@ -652,15 +649,9 @@ function LastExpenseWidget() {
   const [expense, setExpense] = useState<ExpenseRow | null>(null);
 
   useEffect(() => {
-    supabase
-      .from("expenses")
-      .select("date,category,description,amount")
-      .eq("user_id", USER_ID)
-      .order("date", { ascending: false })
-      .limit(1)
-      .then(({ data, error }) => {
-        if (!error && data && data[0]) setExpense(data[0] as ExpenseRow);
-      });
+    fetch("/api/finance/last-expense")
+      .then(r => r.json())
+      .then(({ expense: e }) => { if (e) setExpense(e as ExpenseRow); });
   }, []);
 
   if (!expense) return (

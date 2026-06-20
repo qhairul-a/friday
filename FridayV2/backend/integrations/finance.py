@@ -195,6 +195,21 @@ def delete_variable_expense(query: str, date: str = None) -> str:
 
 # ─── Analytics ────────────────────────────────────────────────────────────────
 
+def get_last_variable_expense() -> dict | None:
+    """Return the most recent variable expense row, or None if no entries."""
+    rows = get_all_rows(_variable_id())
+    if not rows:
+        return None
+    sorted_rows = sorted(rows, key=lambda r: r.get("Date", ""), reverse=True)
+    last = sorted_rows[0]
+    return {
+        "date": last.get("Date", ""),
+        "category": last.get("Category", ""),
+        "description": last.get("Description", ""),
+        "amount": _parse_amount(last.get("Amount", 0)),
+    }
+
+
 def get_financial_summary(month: str = None) -> str:
     month = month or _current_month()
     cur = settings.CURRENCY
