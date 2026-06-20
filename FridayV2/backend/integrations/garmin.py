@@ -3,6 +3,9 @@ Garmin Connect API wrapper.
 Handles authentication, token caching, and raw metric fetching.
 All functions return empty dicts / None on API failure so a partial outage
 doesn't break a full sync.
+
+Token persistence: tokens are stored both on disk (GARMIN_TOKEN_DIR) and in
+Supabase (profiles.data.garmin_tokens) so they survive container restarts.
 """
 
 import logging
@@ -16,7 +19,78 @@ from core.config import settings
 logger = logging.getLogger(__name__)
 
 _garmin_client: Garmin | None = None
+_pending_mfa: dict | None = None  # holds {"client": Garmin, "state": ...} during 2FA
 
+
+# ── Token persistence helpers ─────────────────────────────────────────────────
+
+def _save_tokens(client: Garmin) -> None:
+    """Serialize garth tokens and save to disk + Supabase."""
+    try:
+        token_dir = settings.GARMIN_TOKEN_DIR
+        token_dir.mkdir(parents=True, exist_ok=True)
+        client.client.dump(str(token_dir))
+        token_str = client.client.dumps()
+        from core.supabase_client import supabase as _supa
+        result = _supa.table("profiles").select("data").eq("user_id", "default").single().execute()
+        current = result.data.get("data", {}) if result.data else {}
+        current["garmin_tokens"] = token_str
+        _supa.table("profiles").update({"data": current}).eq("user_id", "default").execute()
+        logger.info("Garmin tokens saved to disk and Supabase")
+    except Exception as e:
+        logger.warning("Failed to persist Garmin tokens: %s", e)
+
+
+def _load_tokens_from_supabase() -> str | None:
+    """Return garth token string from Supabase, or None if not found."""
+    try:
+        from core.supabase_client import supabase as _supa
+        result = _supa.table("profiles").select("data").eq("user_id", "default").single().execute()
+        if not result.data:
+            return None
+        return result.data.get("data", {}).get("garmin_tokens")
+    except Exception as e:
+        logger.warning("Failed to load Garmin tokens from Supabase: %s", e)
+        return None
+
+
+# ── MFA flow (called from api.py) ─────────────────────────────────────────────
+
+def request_mfa_code() -> bool:
+    """Initiate fresh Garmin login, which sends a 2FA code to the user's email.
+    Returns True if MFA is required, False if login succeeded without MFA."""
+    global _pending_mfa, _garmin_client
+    _garmin_client = None
+    client = Garmin(
+        email=settings.GARMIN_EMAIL,
+        password=settings.GARMIN_PASSWORD,
+        return_on_mfa=True,
+    )
+    state = client.login()
+    if state:
+        _pending_mfa = {"client": client, "state": state}
+        return True
+    # Login succeeded with no MFA (e.g. session still valid)
+    _save_tokens(client)
+    _garmin_client = client
+    _pending_mfa = None
+    return False
+
+
+def complete_mfa(code: str) -> None:
+    """Complete the 2FA flow with the code from the user's email."""
+    global _pending_mfa, _garmin_client
+    if not _pending_mfa:
+        raise RuntimeError("No pending MFA session. Request a code first via /garmin/request-code.")
+    client: Garmin = _pending_mfa["client"]
+    state = _pending_mfa["state"]
+    client.resume_login(state, code.strip())
+    _save_tokens(client)
+    _garmin_client = client
+    _pending_mfa = None
+
+
+# ── Internal client accessor ──────────────────────────────────────────────────
 
 def _client() -> Garmin:
     global _garmin_client
@@ -24,9 +98,24 @@ def _client() -> Garmin:
         return _garmin_client
 
     token_file = settings.GARMIN_TOKEN_DIR / "garmin_tokens.json"
+
+    # If local token is missing, try restoring from Supabase
     if not token_file.exists():
+        token_str = _load_tokens_from_supabase()
+        if token_str:
+            try:
+                client = Garmin(
+                    email=settings.GARMIN_EMAIL or None,
+                    password=settings.GARMIN_PASSWORD or None,
+                )
+                client.client.loads(token_str)
+                _garmin_client = client
+                logger.info("Garmin tokens restored from Supabase")
+                return _garmin_client
+            except Exception as e:
+                logger.warning("Supabase token restore failed: %s", e)
         raise RuntimeError(
-            "Garmin not authenticated. Run: python scripts/setup_garmin.py"
+            "Garmin not authenticated. Use Settings › Health Metrics › Reconnect Garmin."
         )
 
     try:
@@ -38,13 +127,13 @@ def _client() -> Garmin:
         _garmin_client = client
         return _garmin_client
     except GarminConnectAuthenticationError as e:
+        _garmin_client = None
         raise RuntimeError(
-            f"Garmin authentication failed: {e}. Run: python scripts/setup_garmin.py"
-        )
-    except Exception as e:
-        raise RuntimeError(
-            f"Garmin token load failed: {e}. Run: python scripts/setup_garmin.py"
+            f"Garmin session expired. Use Settings › Health Metrics › Reconnect Garmin."
         ) from e
+    except Exception as e:
+        _garmin_client = None
+        raise RuntimeError(f"Garmin token load failed: {e}") from e
 
 
 def _safe(fn, *args, **kwargs):

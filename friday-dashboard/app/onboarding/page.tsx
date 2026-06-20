@@ -75,6 +75,11 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<Section | null>(null);
 
+  // Garmin 2FA reconnect state
+  const [garminStep, setGarminStep] = useState<"idle" | "sending" | "waiting" | "submitting" | "done" | "error">("idle");
+  const [garminCode, setGarminCode] = useState("");
+  const [garminMsg, setGarminMsg] = useState("");
+
   useEffect(() => {
     supabase
       .from("profiles")
@@ -344,6 +349,105 @@ export default function OnboardingPage() {
                     }`}
                   />
                 </button>
+              </div>
+
+              {/* Garmin 2FA reconnect */}
+              <div className="border border-gray-700 rounded-xl p-4 space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-white">Reconnect Garmin</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    If syncs stop working, Garmin has expired your session and sent a 2FA code to your email.
+                    Click <strong className="text-white">Request Code</strong> to trigger a new one, then enter it below.
+                  </p>
+                </div>
+
+                {garminStep === "done" && (
+                  <p className="text-xs text-green-400">{garminMsg}</p>
+                )}
+                {garminStep === "error" && (
+                  <p className="text-xs text-red-400">{garminMsg}</p>
+                )}
+
+                {garminStep !== "done" && (
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      disabled={garminStep === "sending" || garminStep === "submitting"}
+                      onClick={async () => {
+                        setGarminStep("sending");
+                        setGarminMsg("");
+                        try {
+                          const res = await fetch("/api/garmin/request-code", { method: "POST" });
+                          const data = await res.json();
+                          if (!res.ok) throw new Error(data.detail ?? data.error ?? "Failed");
+                          if (data.mfa_required) {
+                            setGarminStep("waiting");
+                            setGarminMsg(data.message);
+                          } else {
+                            setGarminStep("done");
+                            setGarminMsg(data.message);
+                          }
+                        } catch (e) {
+                          setGarminStep("error");
+                          setGarminMsg(String(e));
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium disabled:opacity-50 transition-colors"
+                    >
+                      {garminStep === "sending" ? "Sending…" : "Request Code"}
+                    </button>
+
+                    {(garminStep === "waiting" || garminStep === "submitting") && (
+                      <>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={8}
+                          placeholder="Enter 2FA code"
+                          value={garminCode}
+                          onChange={(e) => setGarminCode(e.target.value.replace(/\D/g, ""))}
+                          className="w-36 bg-gray-800 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                        />
+                        <button
+                          disabled={garminCode.length < 6 || garminStep === "submitting"}
+                          onClick={async () => {
+                            setGarminStep("submitting");
+                            try {
+                              const res = await fetch("/api/garmin/mfa", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ code: garminCode }),
+                              });
+                              const data = await res.json();
+                              if (!res.ok) throw new Error(data.detail ?? data.error ?? "Failed");
+                              setGarminStep("done");
+                              setGarminMsg(data.message);
+                              setGarminCode("");
+                            } catch (e) {
+                              setGarminStep("error");
+                              setGarminMsg(String(e));
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-green-700 hover:bg-green-600 text-white text-xs font-medium disabled:opacity-50 transition-colors"
+                        >
+                          {garminStep === "submitting" ? "Connecting…" : "Submit Code"}
+                        </button>
+                      </>
+                    )}
+
+                    {(garminStep === "error") && (
+                      <button
+                        onClick={() => { setGarminStep("idle"); setGarminMsg(""); setGarminCode(""); }}
+                        className="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-xs font-medium transition-colors"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {garminStep === "waiting" && garminMsg && (
+                  <p className="text-xs text-indigo-300">{garminMsg}</p>
+                )}
               </div>
 
               {/* Metric toggles */}

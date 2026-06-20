@@ -673,6 +673,47 @@ def get_fitness_today():
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+# ─── Garmin auth (2FA / reconnect) ───────────────────────────────────────────
+
+class GarminMFABody(BaseModel):
+    code: str
+
+@app.post("/garmin/request-code")
+def garmin_request_code():
+    """Initiate fresh Garmin login — sends 2FA code to the user's email."""
+    try:
+        from integrations.garmin import request_mfa_code
+        mfa_required = request_mfa_code()
+        if mfa_required:
+            return {"ok": True, "mfa_required": True, "message": "2FA code sent to your Garmin account email. Check your inbox."}
+        return {"ok": True, "mfa_required": False, "message": "Garmin reconnected (no MFA needed)"}
+    except Exception as e:
+        logger.exception("Garmin request-code error")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/garmin/mfa")
+def garmin_complete_mfa(body: GarminMFABody):
+    """Complete Garmin 2FA with the code from the email."""
+    try:
+        from integrations.garmin import complete_mfa
+        complete_mfa(body.code)
+        return {"ok": True, "message": "Garmin reconnected successfully. Future syncs will work automatically."}
+    except Exception as e:
+        logger.exception("Garmin MFA error")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/garmin/status")
+def garmin_status():
+    """Check if Garmin tokens are present (does not call the Garmin API)."""
+    from integrations.garmin import settings as _s, _load_tokens_from_supabase
+    token_file = _s.GARMIN_TOKEN_DIR / "garmin_tokens.json"
+    has_local = token_file.exists()
+    has_supabase = bool(_load_tokens_from_supabase())
+    return {"connected": has_local or has_supabase}
+
+
 # ─── Weather ──────────────────────────────────────────────────────────────────
 
 @app.get("/weather")
