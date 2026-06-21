@@ -728,6 +728,21 @@ def finance_last_expense():
         return {"expense": None}
 
 
+# ─── Fitness ──────────────────────────────────────────────────────────────────
+
+@app.get("/fitness/latest")
+def fitness_latest():
+    """Return the most recent health_metrics row."""
+    try:
+        from core.supabase_client import supabase
+        result = supabase.table("health_metrics").select("*").eq("user_id", "default").order("date", desc=True).limit(1).execute()
+        rows = result.data
+        return {"metrics": rows[0] if rows else None}
+    except Exception as e:
+        logger.error("fitness/latest error: %s", e)
+        return {"metrics": None}
+
+
 # ─── Weather ──────────────────────────────────────────────────────────────────
 
 @app.get("/weather")

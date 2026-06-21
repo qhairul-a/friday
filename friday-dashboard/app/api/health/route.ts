@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { supabase, USER_ID } from "@/lib/supabase";
 
+const BACKEND = process.env.BACKEND_URL ?? "";
+
 export async function GET() {
   const [{ data: raw }, { data: profileRow }] = await Promise.all([
     supabase
@@ -13,10 +15,23 @@ export async function GET() {
     supabase.from("profiles").select("data").eq("user_id", USER_ID).single(),
   ]);
 
-  const enabled: string[] = profileRow?.data?.integrations?.garmin_metrics ?? [];
-  const connected: boolean = profileRow?.data?.integrations?.garmin_enabled ?? false;
+  const ALL_METRICS = ["body_battery","sleep_duration","sleep_score","sleep_stages","heart_rate_resting","heart_rate_avg","stress_avg","hrv","spo2","calories_active","active_minutes","floors_climbed","vo2_max"];
+  const enabled: string[] = profileRow?.data?.integrations?.garmin_metrics?.length
+    ? profileRow.data.integrations.garmin_metrics
+    : ALL_METRICS;
 
-  // health_metrics columns already match the HealthMetrics shape exactly
+  // Prefer backend live status over potentially stale profile flag
+  let connected: boolean = profileRow?.data?.integrations?.garmin_enabled ?? false;
+  if (BACKEND) {
+    try {
+      const res = await fetch(`${BACKEND}/garmin/status`, { cache: "no-store" });
+      const status = await res.json();
+      connected = status.connected ?? connected;
+    } catch {
+      // keep profile value if backend unreachable
+    }
+  }
+
   const metrics = raw ? {
     date: raw.date,
     steps: raw.steps ?? null,
