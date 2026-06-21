@@ -743,6 +743,26 @@ def fitness_latest():
         return {"metrics": None}
 
 
+@app.get("/fitness/trends")
+def fitness_trends(days: int = 14):
+    """Return health_metrics rows for the last N days."""
+    try:
+        from core.supabase_client import supabase
+        from datetime import datetime, timedelta
+        from zoneinfo import ZoneInfo
+        days = min(days, 90)
+        start = (datetime.now(ZoneInfo(settings.TIMEZONE)) - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+        result = supabase.table("health_metrics").select(
+            "date,steps,distance_km,heart_rate_avg,heart_rate_resting,stress_avg,"
+            "sleep_duration_hrs,sleep_deep_hrs,sleep_light_hrs,sleep_rem_hrs,"
+            "body_battery_high,body_battery_low"
+        ).eq("user_id", "default").gte("date", start).order("date").execute()
+        return {"data": result.data}
+    except Exception as e:
+        logger.error("fitness/trends error: %s", e)
+        return {"data": []}
+
+
 # ─── Weather ──────────────────────────────────────────────────────────────────
 
 @app.get("/weather")
