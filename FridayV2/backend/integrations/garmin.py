@@ -32,10 +32,11 @@ def _save_tokens(client: Garmin) -> None:
         client.client.dump(str(token_dir))
         token_str = client.client.dumps()
         from core.supabase_client import supabase as _supa
-        result = _supa.table("profiles").select("data").eq("user_id", "default").single().execute()
-        current = result.data.get("data", {}) if result.data else {}
-        current["garmin_tokens"] = token_str
-        _supa.table("profiles").update({"data": current}).eq("user_id", "default").execute()
+        # upsert so tokens are saved even if the profiles row doesn't exist yet
+        _supa.table("profiles").upsert(
+            {"user_id": "default", "data": {"garmin_tokens": token_str}},
+            on_conflict="user_id",
+        ).execute()
         logger.info("Garmin tokens saved to disk and Supabase")
     except Exception as e:
         logger.warning("Failed to persist Garmin tokens: %s", e)
