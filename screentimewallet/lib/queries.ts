@@ -104,3 +104,51 @@ export async function getScreentimeSessions(child?: ChildName): Promise<Screenti
   if (error) throw error
   return (data ?? []) as ScreentimeSession[]
 }
+
+// --- Child profiles ---
+export async function getChildProfiles(): Promise<Record<ChildName, string | null>> {
+  const { data } = await supabase.from('child_profiles').select('child_name, photo_url')
+  const map: Record<ChildName, string | null> = { qasim: null, muadz: null }
+  if (data) data.forEach((r: { child_name: ChildName; photo_url: string | null }) => { map[r.child_name] = r.photo_url })
+  return map
+}
+
+export async function setChildPhotoUrl(child: ChildName, url: string | null): Promise<void> {
+  const { error } = await supabase.from('child_profiles').upsert({ child_name: child, photo_url: url, updated_at: new Date().toISOString() })
+  if (error) throw error
+}
+
+// Upload photo to Supabase Storage and return public URL
+export async function uploadChildPhoto(child: ChildName, file: File): Promise<string> {
+  const ext = file.name.split('.').pop() ?? 'jpg'
+  const path = `${child}.${ext}`
+  const { error } = await supabase.storage.from('profile-photos').upload(path, file, { upsert: true, contentType: file.type })
+  if (error) throw error
+  const { data } = supabase.storage.from('profile-photos').getPublicUrl(path)
+  // Bust cache with timestamp
+  return `${data.publicUrl}?t=${Date.now()}`
+}
+
+// --- Reading session CRUD ---
+export async function deleteReadingSession(id: string): Promise<void> {
+  const { error } = await supabase.from('reading_sessions').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function updateReadingSession(
+  id: string,
+  updates: { started_at: string; ended_at: string; duration_minutes: number; child_name: ChildName }
+): Promise<void> {
+  const { error } = await supabase.from('reading_sessions').update(updates).eq('id', id)
+  if (error) throw error
+}
+
+export async function createReadingSession(data: {
+  child_name: ChildName
+  started_at: string
+  ended_at: string
+  duration_minutes: number
+}): Promise<void> {
+  const { error } = await supabase.from('reading_sessions').insert({ ...data })
+  if (error) throw error
+}
