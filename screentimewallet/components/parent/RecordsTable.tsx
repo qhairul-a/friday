@@ -4,6 +4,9 @@ import type { ReadingSession, ChildName } from '@/types'
 
 interface Props {
   sessions: ReadingSession[]
+  onAdd: () => void
+  onEdit: (session: ReadingSession) => void
+  onDelete: (id: string) => void
 }
 
 const PAGE_SIZE = 20
@@ -20,9 +23,10 @@ const CHILD_STYLE: Record<ChildName, string> = {
   muadz: 'bg-emerald-900/50 text-emerald-300 border border-emerald-700',
 }
 
-export function RecordsTable({ sessions }: Props) {
+export function RecordsTable({ sessions, onAdd, onEdit, onDelete }: Props) {
   const [filter, setFilter] = useState<ChildName | 'all'>('all')
   const [page, setPage] = useState(1)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const filtered = filter === 'all' ? sessions : sessions.filter(s => s.child_name === filter)
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
@@ -33,23 +37,40 @@ export function RecordsTable({ sessions }: Props) {
     setPage(1)
   }
 
+  function handleDelete(id: string) {
+    if (confirmDelete === id) {
+      onDelete(id)
+      setConfirmDelete(null)
+    } else {
+      setConfirmDelete(id)
+    }
+  }
+
   return (
     <div className="space-y-4">
-      {/* Filter buttons */}
-      <div className="flex gap-2">
-        {(['all', 'qasim', 'muadz'] as const).map(f => (
-          <button
-            key={f}
-            onClick={() => changeFilter(f)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium capitalize transition-colors ${
-              filter === f
-                ? 'bg-violet-600 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-          >
-            {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
-          </button>
-        ))}
+      {/* Header row: filter + add */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2">
+          {(['all', 'qasim', 'muadz'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => changeFilter(f)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium capitalize transition-colors ${
+                filter === f
+                  ? 'bg-violet-600 text-white'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
+            >
+              {f === 'all' ? 'All' : f}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={onAdd}
+          className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-medium transition-colors"
+        >
+          + Add Entry
+        </button>
       </div>
 
       {/* Table */}
@@ -60,8 +81,8 @@ export function RecordsTable({ sessions }: Props) {
           <table className="w-full text-sm">
             <thead className="bg-slate-800 text-slate-400">
               <tr>
-                {['Date', 'Child', 'Start', 'End', 'Earned'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>
+                {['Date', 'Child', 'Start', 'End', 'Earned', ''].map((h, i) => (
+                  <th key={i} className="px-4 py-3 text-left font-medium">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -77,6 +98,26 @@ export function RecordsTable({ sessions }: Props) {
                   <td className="px-4 py-3 text-slate-300">{fmt(s.started_at, 'time')}</td>
                   <td className="px-4 py-3 text-slate-300">{fmt(s.ended_at, 'time')}</td>
                   <td className="px-4 py-3 text-emerald-400 font-semibold">+{s.duration_minutes} min</td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => onEdit(s)}
+                        className="text-xs px-2 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(s.id)}
+                        className={`text-xs px-2 py-1 rounded-lg transition-colors ${
+                          confirmDelete === s.id
+                            ? 'bg-red-600 text-white'
+                            : 'bg-slate-700 hover:bg-red-800 text-slate-300'
+                        }`}
+                      >
+                        {confirmDelete === s.id ? 'Confirm?' : 'Delete'}
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
