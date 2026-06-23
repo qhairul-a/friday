@@ -1,8 +1,27 @@
-export default function ParentPage() {
+import { createServerClient } from '@/lib/supabase-server'
+import { ParentDashboard } from '@/components/parent/ParentDashboard'
+import type { ReadingSession, ScreentimeSession } from '@/types'
+
+export default async function ParentPage() {
+  const supabase = createServerClient()
+
+  const [{ data: reading }, { data: screentime }] = await Promise.all([
+    supabase
+      .from('reading_sessions')
+      .select('*')
+      .not('ended_at', 'is', null)
+      .order('started_at', { ascending: false }),
+    supabase
+      .from('screentime_sessions')
+      .select('*')
+      .not('ended_at', 'is', null)
+      .order('started_at', { ascending: false }),
+  ])
+
   return (
-    <main className="min-h-screen p-6">
-      <h1 className="text-2xl font-bold text-white">Parent Dashboard</h1>
-      <p className="text-slate-400">Coming soon...</p>
-    </main>
+    <ParentDashboard
+      readingSessions={(reading ?? []) as ReadingSession[]}
+      screentimeSessions={(screentime ?? []) as ScreentimeSession[]}
+    />
   )
 }

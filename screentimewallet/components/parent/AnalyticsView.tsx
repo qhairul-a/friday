@@ -134,7 +134,8 @@ export function AnalyticsView({ readingSessions, screentimeSessions }: Props) {
             <YAxis domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 12 }} />
             <Tooltip
               contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
-              formatter={(v: number) => `${v}%`}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              formatter={(v: any) => `${v}%`}
             />
             <Bar dataKey="Utilization %" fill="#3b82f6" radius={[4, 4, 0, 0]} />
           </BarChart>
