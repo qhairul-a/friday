@@ -90,7 +90,7 @@ export async function getReadingSessions(child?: ChildName): Promise<ReadingSess
   if (child) q = q.eq('child_name', child)
   const { data, error } = await q
   if (error) throw error
-  return data ?? []
+  return (data ?? []) as ReadingSession[]
 }
 
 export async function getScreentimeSessions(child?: ChildName): Promise<ScreentimeSession[]> {
@@ -102,5 +102,5 @@ export async function getScreentimeSessions(child?: ChildName): Promise<Screenti
   if (child) q = q.eq('child_name', child)
   const { data, error } = await q
   if (error) throw error
-  return data ?? []
+  return (data ?? []) as ScreentimeSession[]
 }
