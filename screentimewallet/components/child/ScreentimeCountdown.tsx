@@ -1,4 +1,5 @@
 'use client'
+import { useEffect } from 'react'
 import { useScreentimeCountdown } from '@/hooks/useScreentimeCountdown'
 import { TimesUpOverlay } from './TimesUpOverlay'
 import type { ChildName } from '@/types'
@@ -8,6 +9,7 @@ interface Props {
   balance: number
   onSetBalance: (minutes: number) => Promise<void>
   readingActive: boolean
+  onActiveChange?: (active: boolean) => void
 }
 
 function formatCountdown(seconds: number) {
@@ -16,9 +18,11 @@ function formatCountdown(seconds: number) {
   return `${m}:${s}`
 }
 
-export function ScreentimeCountdown({ child, balance, onSetBalance, readingActive }: Props) {
+export function ScreentimeCountdown({ child, balance, onSetBalance, readingActive, onActiveChange }: Props) {
   const { isActive, remainingSeconds, isLoading, timesUp, start, stop, dismissTimesUp } =
     useScreentimeCountdown(child, balance, onSetBalance)
+
+  useEffect(() => { onActiveChange?.(isActive) }, [isActive, onActiveChange])
 
   if (isLoading) return <div className="animate-pulse text-slate-500 text-center py-8">Loading...</div>
 

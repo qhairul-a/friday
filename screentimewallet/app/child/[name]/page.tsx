@@ -81,12 +81,14 @@ function ChildView({ child }: { child: ChildName }) {
           child={child}
           onEarned={handleEarned}
           screentimeActive={screentimeActive}
+          onActiveChange={setReadingActive}
         />
         <ScreentimeCountdown
           child={child}
           balance={balance}
           onSetBalance={handleSetBalance}
           readingActive={readingActive}
+          onActiveChange={setScreentimeActive}
         />
       </div>
     </main>

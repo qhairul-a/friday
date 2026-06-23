@@ -1,4 +1,5 @@
 'use client'
+import { useEffect } from 'react'
 import { useReadingTimer } from '@/hooks/useReadingTimer'
 import type { ChildName } from '@/types'
 
@@ -6,6 +7,7 @@ interface Props {
   child: ChildName
   onEarned: (minutes: number) => void
   screentimeActive: boolean
+  onActiveChange?: (active: boolean) => void
 }
 
 function formatTime(seconds: number) {
@@ -14,8 +16,10 @@ function formatTime(seconds: number) {
   return `${m}:${s}`
 }
 
-export function ReadingTimer({ child, onEarned, screentimeActive }: Props) {
+export function ReadingTimer({ child, onEarned, screentimeActive, onActiveChange }: Props) {
   const { isActive, elapsedSeconds, isLoading, start, stop } = useReadingTimer(child, onEarned)
+
+  useEffect(() => { onActiveChange?.(isActive) }, [isActive, onActiveChange])
 
   if (isLoading) return <div className="animate-pulse text-slate-500 text-center py-8">Loading...</div>
 
