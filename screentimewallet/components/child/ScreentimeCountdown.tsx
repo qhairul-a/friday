@@ -18,6 +18,16 @@ function formatCountdown(seconds: number) {
   return `${m}:${s}`
 }
 
+function formatBalance(balanceMinutes: number) {
+  const totalSeconds = Math.round(balanceMinutes * 60)
+  const hours = Math.floor(totalSeconds / 3600)
+  const mins = Math.floor((totalSeconds % 3600) / 60)
+  const secs = totalSeconds % 60
+  if (hours > 0) return `${hours}h ${mins}m`
+  if (secs > 0) return `${mins}m ${secs}s`
+  return `${mins}m`
+}
+
 export function ScreentimeCountdown({ child, balance, onSetBalance, readingActive, onActiveChange }: Props) {
   const { isActive, remainingSeconds, isLoading, timesUp, start, stop, dismissTimesUp } =
     useScreentimeCountdown(child, balance, onSetBalance)
@@ -44,11 +54,7 @@ export function ScreentimeCountdown({ child, balance, onSetBalance, readingActiv
 
         {!isActive && (
           <div className="text-center">
-            <div className="text-3xl font-bold text-slate-400">
-              {Math.floor(balance / 60) > 0
-                ? `${Math.floor(balance / 60)}h ${balance % 60}m`
-                : `${balance}m`}
-            </div>
+            <div className="text-3xl font-bold text-slate-400">{formatBalance(balance)}</div>
             <div className="text-slate-500 text-sm mt-1">available</div>
           </div>
         )}
