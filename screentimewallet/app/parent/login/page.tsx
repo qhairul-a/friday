@@ -1,13 +1,11 @@
 'use client'
 import { useState, FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function ParentLogin() {
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -20,7 +18,7 @@ export default function ParentLogin() {
     })
     setLoading(false)
     if (res.ok) {
-      router.replace('/parent')
+      window.location.href = '/parent'
     } else {
       setError('Wrong PIN. Try again.')
       setPin('')
