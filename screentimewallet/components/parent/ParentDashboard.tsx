@@ -1,9 +1,9 @@
 'use client'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { RecordsTable } from './RecordsTable'
 import { AnalyticsView } from './AnalyticsView'
 import type { ReadingSession, ScreentimeSession } from '@/types'
-import Link from 'next/link'
 
 interface Props {
   readingSessions: ReadingSession[]
@@ -14,14 +14,23 @@ type Tab = 'records' | 'analytics'
 
 export function ParentDashboard({ readingSessions, screentimeSessions }: Props) {
   const [tab, setTab] = useState<Tab>('records')
+  const router = useRouter()
+
+  async function handleGoHome() {
+    await fetch('/api/parent-logout', { method: 'POST' })
+    router.push('/')
+  }
 
   return (
     <main className="min-h-screen p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold text-white">Parent Dashboard</h1>
-        <Link href="/" className="text-slate-500 hover:text-slate-300 text-sm transition-colors">
+        <button
+          onClick={handleGoHome}
+          className="text-slate-500 hover:text-slate-300 text-sm transition-colors"
+        >
           ← Home
-        </Link>
+        </button>
       </div>
 
       {/* Tabs */}
