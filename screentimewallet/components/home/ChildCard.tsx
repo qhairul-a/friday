@@ -1,9 +1,11 @@
 import Link from 'next/link'
+import Image from 'next/image'
 
 interface Props {
   name: string
   emoji: string
   color: 'violet' | 'emerald'
+  photoUrl?: string | null
 }
 
 const colorMap = {
@@ -17,11 +19,19 @@ const colorMap = {
   },
 }
 
-export function ChildCard({ name, emoji, color }: Props) {
+export function ChildCard({ name, emoji, color, photoUrl }: Props) {
   return (
     <Link href={`/child/${name}`}>
       <div className={`${colorMap[color].card} border-2 rounded-3xl p-12 text-center cursor-pointer transition-all duration-150 active:scale-95 min-w-[180px]`}>
-        <div className="text-7xl mb-4">{emoji}</div>
+        <div className="flex items-center justify-center mb-4">
+          {photoUrl ? (
+            <div className="w-20 h-20 rounded-full overflow-hidden relative">
+              <Image src={photoUrl} alt={name} fill className="object-cover" unoptimized />
+            </div>
+          ) : (
+            <div className="text-7xl">{emoji}</div>
+          )}
+        </div>
         <div className={`text-2xl font-bold ${colorMap[color].text} capitalize`}>{name}</div>
       </div>
     </Link>

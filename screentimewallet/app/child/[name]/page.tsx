@@ -1,11 +1,13 @@
 'use client'
-import { use, useState, useCallback } from 'react'
+import { use, useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { useBalance } from '@/hooks/useBalance'
 import { BalanceDisplay } from '@/components/child/BalanceDisplay'
 import { ReadingTimer } from '@/components/child/ReadingTimer'
 import { ScreentimeCountdown } from '@/components/child/ScreentimeCountdown'
 import { SessionGuard } from '@/components/child/SessionGuard'
+import { supabase } from '@/lib/supabase'
 import type { ChildName } from '@/types'
 import Link from 'next/link'
 
@@ -41,6 +43,12 @@ function ChildView({ child }: { child: ChildName }) {
   const [guardDone, setGuardDone] = useState(false)
   const [readingActive, setReadingActive] = useState(false)
   const [screentimeActive, setScreentimeActive] = useState(false)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.from('child_profiles').select('photo_url').eq('child_name', child).single()
+      .then(({ data }) => { if (data?.photo_url) setPhotoUrl(data.photo_url) })
+  }, [child])
 
   const handleGuardResolved = useCallback(() => setGuardDone(true), [])
 
@@ -70,8 +78,15 @@ function ChildView({ child }: { child: ChildName }) {
       </div>
 
       <div className="w-full text-center space-y-4 py-4">
-        <h1 className="text-3xl font-bold text-white capitalize">
-          Hey, {child} {emoji}
+        <h1 className="text-3xl font-bold text-white capitalize flex items-center justify-center gap-3">
+          {photoUrl ? (
+            <div className="w-10 h-10 rounded-full overflow-hidden relative flex-shrink-0">
+              <Image src={photoUrl} alt={child} fill className="object-cover" unoptimized />
+            </div>
+          ) : (
+            <span>{emoji}</span>
+          )}
+          Hey, {child}
         </h1>
         <BalanceDisplay balance={balance} color={color} />
       </div>

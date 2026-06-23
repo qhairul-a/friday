@@ -3,17 +3,24 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { RecordsTable } from './RecordsTable'
 import { AnalyticsView } from './AnalyticsView'
-import type { ReadingSession, ScreentimeSession } from '@/types'
+import { SessionModal } from './SessionModal'
+import { ProfileManager } from './ProfileManager'
+import { createReadingSession, updateReadingSession, deleteReadingSession } from '@/lib/queries'
+import type { ReadingSession, ScreentimeSession, ChildName } from '@/types'
 
 interface Props {
   readingSessions: ReadingSession[]
   screentimeSessions: ScreentimeSession[]
+  initialPhotos: Record<ChildName, string | null>
 }
 
 type Tab = 'records' | 'analytics'
+type ModalState = null | 'add' | ReadingSession
 
-export function ParentDashboard({ readingSessions, screentimeSessions }: Props) {
+export function ParentDashboard({ readingSessions, screentimeSessions, initialPhotos }: Props) {
   const [tab, setTab] = useState<Tab>('records')
+  const [sessions, setSessions] = useState<ReadingSession[]>(readingSessions)
+  const [modal, setModal] = useState<ModalState>(null)
   const router = useRouter()
 
   async function handleGoHome() {
@@ -21,9 +28,32 @@ export function ParentDashboard({ readingSessions, screentimeSessions }: Props) 
     router.push('/')
   }
 
+  async function handleSave(data: { child_name: ChildName; started_at: string; ended_at: string; duration_minutes: number }) {
+    if (modal === 'add') {
+      await createReadingSession(data)
+    } else if (modal && typeof modal === 'object') {
+      await updateReadingSession(modal.id, data)
+    }
+    setModal(null)
+    router.refresh()
+  }
+
+  async function handleDelete(id: string) {
+    await deleteReadingSession(id)
+    setSessions(prev => prev.filter(s => s.id !== id))
+  }
+
   return (
     <main className="min-h-screen p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+      {modal !== null && (
+        <SessionModal
+          session={modal === 'add' ? null : modal}
+          onSave={handleSave}
+          onClose={() => setModal(null)}
+        />
+      )}
+
+      <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-white">Parent Dashboard</h1>
         <button
           onClick={handleGoHome}
@@ -32,6 +62,8 @@ export function ParentDashboard({ readingSessions, screentimeSessions }: Props) 
           ← Home
         </button>
       </div>
+
+      <ProfileManager initialPhotos={initialPhotos} />
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6">
@@ -48,10 +80,17 @@ export function ParentDashboard({ readingSessions, screentimeSessions }: Props) 
         ))}
       </div>
 
-      {tab === 'records' && <RecordsTable sessions={readingSessions} />}
+      {tab === 'records' && (
+        <RecordsTable
+          sessions={sessions}
+          onAdd={() => setModal('add')}
+          onEdit={s => setModal(s)}
+          onDelete={handleDelete}
+        />
+      )}
       {tab === 'analytics' && (
         <AnalyticsView
-          readingSessions={readingSessions}
+          readingSessions={sessions}
           screentimeSessions={screentimeSessions}
         />
       )}
