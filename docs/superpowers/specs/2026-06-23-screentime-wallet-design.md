@@ -14,7 +14,7 @@ A standalone web app for two children (Qasim & Muadz) to track reading time and 
 
 | Concern | Choice |
 |---|---|
-| Framework | Next.js (TypeScript, Tailwind CSS) — new standalone project |
+| Framework | Next.js (TypeScript, Tailwind CSS) — standalone project at `Claude/screentimewallet/` |
 | Database | Supabase — same project as friday-dashboard, new tables |
 | Charts | Recharts |
 | TTS | Web Speech API (browser-native, no cost) |
