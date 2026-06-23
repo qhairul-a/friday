@@ -1,6 +1,7 @@
 'use client'
 import { useState, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function ParentLogin() {
   const [pin, setPin] = useState('')
@@ -53,6 +54,10 @@ export default function ParentLogin() {
             {loading ? 'Checking...' : 'Enter'}
           </button>
         </form>
+
+        <Link href="/" className="block mt-6 text-slate-600 hover:text-slate-400 text-sm transition-colors">
+          ← Back to Home
+        </Link>
       </div>
     </main>
   )

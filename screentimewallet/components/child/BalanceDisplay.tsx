@@ -9,13 +9,21 @@ const colorMap = {
 }
 
 export function BalanceDisplay({ balance, color }: Props) {
-  const hours = Math.floor(balance / 60)
-  const mins = balance % 60
+  const totalSeconds = Math.round(balance * 60)
+  const hours = Math.floor(totalSeconds / 3600)
+  const mins = Math.floor((totalSeconds % 3600) / 60)
+  const secs = totalSeconds % 60
+
+  const display = hours > 0
+    ? `${hours}h ${mins}m`
+    : secs > 0
+    ? `${mins}m ${secs}s`
+    : `${mins}m`
 
   return (
     <div className="text-center">
       <div className={`text-6xl font-bold tabular-nums ${colorMap[color].value}`}>
-        {hours > 0 ? `${hours}h ${mins}m` : `${mins}m`}
+        {display}
       </div>
       <div className={`text-sm mt-1 ${colorMap[color].label}`}>screen time balance</div>
     </div>

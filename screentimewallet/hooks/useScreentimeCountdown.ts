@@ -85,10 +85,9 @@ export function useScreentimeCountdown(
     if (!sessionIdRef.current) return
     if (intervalRef.current) clearInterval(intervalRef.current)
     const usedSeconds = initialBalanceRef.current * 60 - remainingSeconds
-    const usedMinutes = Math.floor(usedSeconds / 60)
-    const remainingMinutes = Math.floor(remainingSeconds / 60)
-    await endScreentimeSession(sessionIdRef.current, usedMinutes)
-    await onSetBalance(remainingMinutes)
+    // Store exact fractional minutes so rollover preserves every second
+    await endScreentimeSession(sessionIdRef.current, usedSeconds / 60)
+    await onSetBalance(remainingSeconds / 60)
     sessionIdRef.current = null
     setIsActive(false)
   }, [remainingSeconds, onSetBalance])
