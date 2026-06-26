@@ -74,6 +74,7 @@ from livekit.plugins import deepgram, anthropic
 import requests as _http
 
 from core.config import settings
+from integrations.conversation_history import load_history, save_messages
 from integrations.gdrive_notes import (
     save_note, list_notes, search_notes, read_note, edit_note, delete_note, search_vault,
 )
@@ -389,13 +390,33 @@ async def entrypoint(ctx: JobContext):
     await ctx.connect()
     logging.info("[friday] connected to LiveKit room")
 
-    # Load user memory — 8s timeout so a slow Supabase never blocks the session.
+    # Load user memory and recent conversation history in parallel.
+    memory_ctx = "(Memory unavailable)"
+    recent_history: list[dict] = []
     try:
-        memory_ctx = await asyncio.wait_for(asyncio.to_thread(load_memory), timeout=8.0)
-        logging.info("[friday] memory loaded")
+        memory_ctx, recent_history = await asyncio.gather(
+            asyncio.wait_for(asyncio.to_thread(load_memory), timeout=8.0),
+            asyncio.wait_for(asyncio.to_thread(load_history), timeout=5.0),
+            return_exceptions=True,
+        )
+        if isinstance(memory_ctx, Exception):
+            logging.warning("[friday] load_memory failed: %s", memory_ctx)
+            memory_ctx = "(Memory unavailable)"
+        if isinstance(recent_history, Exception):
+            logging.warning("[friday] load_history failed: %s", recent_history)
+            recent_history = []
+        logging.info("[friday] memory + %d history messages loaded", len(recent_history))
     except Exception as e:
-        logging.warning("[friday] load_memory failed or timed out (%s), continuing without memory", e)
-        memory_ctx = "(Memory unavailable)"
+        logging.warning("[friday] context load failed (%s), continuing without", e)
+
+    # Format recent conversation for injection into system prompt
+    history_block = ""
+    if recent_history:
+        lines = []
+        for m in recent_history[-20:]:
+            prefix = "Q:" if m["role"] == "user" else "Friday:"
+            lines.append(f"{prefix} {m['content']}")
+        history_block = "\n\n--- Recent conversation (across all channels) ---\n" + "\n".join(lines) + "\n---"
 
     tz = ZoneInfo(settings.TIMEZONE)
     now = datetime.now(tz).strftime("%A, %d %B %Y, %I:%M %p")
@@ -405,6 +426,7 @@ async def entrypoint(ctx: JobContext):
             currency=settings.CURRENCY,
             memory=memory_ctx,
         )
+        + history_block
     )
 
     logging.info("[friday] building AgentSession")
@@ -424,6 +446,20 @@ async def entrypoint(ctx: JobContext):
     logging.info("[friday] starting session")
     await session.start(FridayVoiceAgent(instructions), room=ctx.room)
     logging.info("[friday] session started — generating greeting")
+
+    # Persist each completed turn to shared conversation history
+    @session.on("conversation_item_added")
+    def _on_item(ev) -> None:
+        try:
+            item = ev.item
+            role = str(item.role).lower().replace("role.", "")
+            text = item.text_content
+            if text and role in ("user", "assistant"):
+                asyncio.ensure_future(asyncio.to_thread(
+                    save_messages, [{"role": role, "content": text}], "voice"
+                ))
+        except Exception as exc:
+            logging.warning("[friday] could not save conversation item: %s", exc)
 
     try:
         await session.generate_reply(instructions=(

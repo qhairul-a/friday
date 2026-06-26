@@ -25,24 +25,24 @@ from core.config import settings
 from agents.friday import run_friday
 from integrations.memory import extract_and_save
 from integrations.healthcheck import check_all
+from integrations.conversation_history import load_history, save_messages
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Per-user conversation history — keyed by Telegram user ID
-_sessions: dict[int, list[dict]] = {}
 
 # Module-level reference so api.py can trigger reschedules
 _tg_app = None
 
 
-def _get_history(user_id: int) -> list[dict]:
-    return _sessions.get(user_id, [])
+def _get_history() -> list[dict]:
+    return load_history()
 
 
-def _set_history(user_id: int, history: list[dict]) -> None:
-    # Keep last 20 turns to bound memory and token cost
-    _sessions[user_id] = history[-40:]
+def _persist_turn(user_input: str, response: str) -> None:
+    save_messages([
+        {"role": "user", "content": user_input},
+        {"role": "assistant", "content": response},
+    ], source="telegram")
 
 
 def _is_authorized(update: Update) -> bool:
@@ -158,10 +158,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if not user_input:
         return
 
-    history = _get_history(update.effective_user.id)
+    history = await asyncio.to_thread(_get_history)
     try:
-        response, updated_history = await asyncio.to_thread(run_friday, user_input, history)
-        _set_history(update.effective_user.id, updated_history)
+        response, _ = await asyncio.to_thread(run_friday, user_input, history)
+        asyncio.create_task(asyncio.to_thread(_persist_turn, user_input, response))
         await update.message.reply_text(response)
         asyncio.create_task(asyncio.to_thread(extract_and_save, user_input, response))
     except Exception as e:
@@ -189,10 +189,10 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text("Sorry, I couldn't make out that voice message.")
         return
 
-    history = _get_history(update.effective_user.id)
+    history = await asyncio.to_thread(_get_history)
     try:
-        response, updated_history = await asyncio.to_thread(run_friday, transcript, history)
-        _set_history(update.effective_user.id, updated_history)
+        response, _ = await asyncio.to_thread(run_friday, transcript, history)
+        asyncio.create_task(asyncio.to_thread(_persist_turn, transcript, response))
         await update.message.reply_text(f'_"{transcript}"_\n\n{response}', parse_mode="Markdown")
         asyncio.create_task(asyncio.to_thread(extract_and_save, transcript, response))
     except Exception as e:
@@ -235,6 +235,23 @@ async def reschedule_briefings() -> None:
         logger.error("reschedule_briefings failed: %s", e)
 
 
+async def _task_reminder_check(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Daily 08:00 SGT — ask Friday to check for tasks due in 48 hours and push a reminder if any exist."""
+    try:
+        await asyncio.to_thread(
+            run_friday,
+            (
+                "[BACKGROUND SYSTEM CHECK — do not treat this as a user message] "
+                "Check my Google Tasks for any items due within the next 48 hours. "
+                "If you find any, compose a concise reminder and send it to me using the send_telegram tool. "
+                "If nothing is due soon, do nothing silently."
+            ),
+            [],  # empty history — internal trigger, not a real conversation turn
+        )
+    except Exception as e:
+        logger.error("Task reminder check failed: %s", e)
+
+
 def build_app():
     global _tg_app
     # updater(None) disables long-polling — updates arrive via webhook instead
@@ -254,6 +271,9 @@ def build_app():
         time=dtime(9, 0, tzinfo=ZoneInfo(settings.TIMEZONE)),
         days=(6,),  # 6 = Sunday
     )
+
+    # Daily task reminder check at 08:00 SGT
+    app.job_queue.run_daily(_task_reminder_check, time=dtime(8, 0, tzinfo=ZoneInfo(settings.TIMEZONE)))
 
     # Load all enabled briefings from Supabase
     try:

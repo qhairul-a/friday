@@ -18,7 +18,22 @@ from agents.finance_agent import run_finance_agent
 from agents.navigation_agent import run_navigation_agent
 from integrations.memory import load_memory
 
+import requests as _requests
+
 _client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+
+
+def _send_telegram_message(message: str) -> str:
+    """Send a Telegram message directly to Qhairul via the Bot API."""
+    try:
+        resp = _requests.post(
+            f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage",
+            json={"chat_id": settings.TELEGRAM_USER_ID, "text": message, "parse_mode": "Markdown"},
+            timeout=10,
+        )
+        return "Message sent." if resp.ok else f"Failed: {resp.text}"
+    except Exception as e:
+        return f"Error sending message: {e}"
 
 
 def _system_prompt(memory: str) -> str:
@@ -42,6 +57,12 @@ You have access to sub-agents that handle specialised tasks:
 - **research_agent**: Search the web for information on any topic. Use when the user asks to research, look up, find out about, or search for something online.
 - **finance_agent**: Manage fixed and variable expenses in Google Sheets. Get financial summaries and analytics.
 - **navigation_agent**: Get Google Maps directions to any destination. Only the destination name is needed — nothing else.
+- **send_telegram**: Send Qhairul a Telegram message at any time — reminders, alerts, follow-ups, anything you judge useful. Use proactively whenever you think he would benefit from a heads-up, without waiting to be asked.
+
+IMPORTANT — Telegram messaging:
+- Every response you give IS automatically delivered to Qhairul on Telegram. You have always had this channel — not just for directions.
+- Use **send_telegram** when you are running a background check (e.g. task reminder sweep) and need to push a notification that is separate from the current conversation flow.
+- Feel free to send proactive alerts: upcoming deadlines, calendar conflicts, spending anomalies, anything time-sensitive.
 
 IMPORTANT — navigation rules (never break these):
 1. Trigger on ANY of these: "navigate to", "directions to", "how do I get to", "how to get to", "I need to go to", "take me to", "way to", "route to", or any phrasing where the user wants to travel somewhere.
@@ -50,8 +71,6 @@ IMPORTANT — navigation rules (never break these):
 4. NEVER say you lack GPS, location access, or browser data. You need none of that.
 5. The URL opens in Google Maps on the user's phone. Google Maps uses the device GPS automatically as the starting point.
 6. Return the URL from navigation_agent directly in your response. Do not add commentary about needing more information.
-
-IMPORTANT — your responses ARE the Telegram messages. You do not need any special capability to "send" to Telegram. Whatever text you return is automatically delivered to the user. Always include URLs from sub-agents verbatim in your response so the user receives them as tappable links.
 
 When the user asks you to do something that a sub-agent handles, delegate to it immediately using the tool. After the sub-agent returns a result, summarise it naturally.
 
@@ -135,6 +154,24 @@ TOOLS = [
         },
     },
     {
+        "name": "send_telegram",
+        "description": (
+            "Send Qhairul a Telegram message at any time — reminders, alerts, follow-ups, anything you judge useful. "
+            "Use this when running a background check (e.g. task reminder sweep) and you need to push a notification. "
+            "Do NOT use this during a normal conversation — your response text IS already delivered to Telegram."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "description": "The message to send. Plain text or Markdown.",
+                }
+            },
+            "required": ["message"],
+        },
+    },
+    {
         "name": "navigation_agent",
         "description": (
             "Get Google Maps directions to a destination and return a tappable link. "
@@ -188,6 +225,7 @@ _AGENT_FNS = {
     "research_agent": lambda args: run_research_agent(args["query"]),
     "finance_agent": lambda args: run_finance_agent(args["instruction"]),
     "navigation_agent": lambda args: run_navigation_agent(args["destination"], args.get("mode", "driving")),
+    "send_telegram": lambda args: _send_telegram_message(args["message"]),
 }
 
 
