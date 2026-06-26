@@ -933,7 +933,7 @@ export default function FinancePage() {
                           <span style={{ background: "rgba(34,211,238,0.1)", borderRadius: 4, padding: "1px 6px", fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--cyan)", letterSpacing: "0.05em" }}>
                             {exp.category}
                           </span>
-                          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-3)" }}>{exp.date}</span>
+                          <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-2)" }}>{exp.date}</span>
                         </div>
                       </div>
                     </div>

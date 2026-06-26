@@ -262,7 +262,7 @@ export default function OverviewTab() {
                 </div>
                 <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-3)" }}>
                   <span style={{ background: "rgba(34,211,238,0.1)", borderRadius: 3, padding: "1px 5px", color: "var(--cyan)", marginRight: 4 }}>{exp.category}</span>
-                  {exp.date}
+                  <span style={{ fontSize: 11, color: "var(--text-2)" }}>{exp.date}</span>
                 </p>
               </div>
             </div>
