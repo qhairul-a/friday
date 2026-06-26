@@ -1,0 +1,33 @@
+# Only send FridayV2/backend to Cloud Build — everything else is irrelevant
+.gcloudignore
+.git
+.gitignore
+
+# Other projects in this repo
+kbmi-app/
+screentimewallet/
+docs/
+
+# Frontend (built separately via Vercel)
+FridayV2/frontend/
+
+# Python caches and virtualenvs
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/.venv/
+**/venv/
+**/.env
+
+# Node / npm
+**/node_modules/
+**/.next/
+**/dist/
+**/build/
+
+# Secrets / local files
+FridayV2/backend/secrets/
+FridayV2/backend/data/
+FridayV2/backend/backend.log
+FridayV2/backend/.env
+FridayV2/backend/.env.*
