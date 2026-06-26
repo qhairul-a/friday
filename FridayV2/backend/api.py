@@ -607,6 +607,34 @@ def delete_saving(row_index: int):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+class FixedPaidBody(BaseModel):
+    indices: list[int]
+
+
+@app.get("/finance/fixed_paid")
+def get_fixed_paid():
+    try:
+        from core.supabase_client import get_supabase
+        result = get_supabase().table("user_prefs").select("value").eq("key", "fixed_paid").maybe_single().execute()
+        if result.data:
+            return {"indices": result.data["value"].get("indices", [])}
+        return {"indices": []}
+    except Exception as e:
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@app.put("/finance/fixed_paid")
+def set_fixed_paid(body: FixedPaidBody):
+    try:
+        from core.supabase_client import get_supabase
+        get_supabase().table("user_prefs").upsert({"key": "fixed_paid", "value": {"indices": body.indices}}).execute()
+        return {"ok": True}
+    except Exception as e:
+        logger.exception("Endpoint error")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 # ─── Routines ─────────────────────────────────────────────────────────────────
 
 from core.supabase_client import get_supabase

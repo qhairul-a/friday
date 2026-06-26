@@ -224,11 +224,15 @@ export default function FinancePage() {
         if (raw) loaded[tab] = JSON.parse(raw);
       });
       if (Object.keys(loaded).length) setTabOrders(prev => ({ ...prev, ...loaded }));
-      const paid = localStorage.getItem("fixed_paid");
-      if (paid) setPaidFixed(new Set(JSON.parse(paid)));
       const fo = localStorage.getItem("fixed_expense_order");
       if (fo) setFixedOrder(JSON.parse(fo));
     } catch { /* malformed stored value — ignore */ }
+  }, []);
+
+  useEffect(() => {
+    apiFetch<{ indices: number[] }>("/finance/fixed_paid")
+      .then(d => setPaidFixed(new Set(d.indices)))
+      .catch(() => {});
   }, []);
 
   const load = useCallback(async () => {
@@ -371,13 +375,13 @@ export default function FinancePage() {
     setPaidFixed(prev => {
       const next = new Set(prev);
       if (next.has(idx)) next.delete(idx); else next.add(idx);
-      localStorage.setItem("fixed_paid", JSON.stringify([...next]));
+      apiFetch("/finance/fixed_paid", { method: "PUT", body: JSON.stringify({ indices: [...next] }) }).catch(() => {});
       return next;
     });
   }
   function clearPaidFixed() {
     setPaidFixed(new Set());
-    localStorage.removeItem("fixed_paid");
+    apiFetch("/finance/fixed_paid", { method: "PUT", body: JSON.stringify({ indices: [] }) }).catch(() => {});
   }
   function shiftVarMonth(delta: number) {
     setVarMonth(prev => {
