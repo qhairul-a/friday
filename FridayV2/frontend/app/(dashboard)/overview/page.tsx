@@ -463,7 +463,7 @@ export default function OverviewPage() {
               { label: "Calories", value: fitness.calories?.toLocaleString(),               unit: "kcal"},
             ].map(({ label, value, unit }) => (
               <div key={label}>
-                <div className="label" style={{ marginBottom: 4 }}>{label}</div>
+                <div className="label" style={{ marginBottom: 4, color: "var(--text-2)" }}>{label}</div>
                 <span className="metric-value" style={{ fontSize: 22 }}>{value ?? "—"}</span>
                 {value != null && unit && <span className="metric-unit">{unit}</span>}
               </div>
@@ -537,7 +537,7 @@ export default function OverviewPage() {
                     <div style={{ width: 2, minHeight: 32, background: "var(--violet)", borderRadius: 2, flexShrink: 0, marginTop: 3 }} />
                     <div>
                       <div style={{ fontSize: 13, color: "var(--text-1)", fontWeight: 500 }}>{e.title}</div>
-                      <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>{fmtTime(e.start)}</div>
+                      <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-2)", marginTop: 2 }}>{fmtTime(e.start)}</div>
                     </div>
                   </div>
                 ))}
@@ -707,7 +707,7 @@ export default function OverviewPage() {
                     {r.name}
                   </span>
                   {r.scheduled_time && (
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-3)" }}>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-2)" }}>
                       {r.scheduled_time.slice(0, 5)}
                     </span>
                   )}
@@ -843,7 +843,7 @@ export default function OverviewPage() {
                 { label: "Sunset",     value: weather.sunset },
               ].map(({ label, value }) => (
                 <div key={label}>
-                  <div className="label" style={{ marginBottom: 2, fontSize: 9 }}>{label}</div>
+                  <div className="label" style={{ marginBottom: 2, fontSize: 9, color: "var(--text-2)" }}>{label}</div>
                   <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-1)" }}>{value}</div>
                 </div>
               ))}
