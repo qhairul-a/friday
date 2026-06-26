@@ -24,13 +24,14 @@ const DEFAULT_HEIGHTS: Record<string, number> = {
   spending_trend:      440,
   spending_frequency:  440,
   savings_trend:       440,
+  top5_spending:       320,
   savings:             440,
   variable_expenses:   660,
   fixed_expenses:      660,
 };
 const DEFAULT_SPANS: Record<string, number> = {
   summary: 2, spending_breakdown: 1, spending_trend: 2,
-  spending_frequency: 1, savings_trend: 1, savings: 2,
+  spending_frequency: 1, savings_trend: 1, top5_spending: 1, savings: 2,
   variable_expenses: 2, fixed_expenses: 2,
 };
 
@@ -42,7 +43,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "variable", label: "Var Exp"   },
 ];
 const TAB_WIDGETS: Record<TabId, string[]> = {
-  overview: ["summary", "spending_breakdown", "spending_trend", "spending_frequency", "savings_trend"],
+  overview: ["summary", "spending_breakdown", "spending_trend", "spending_frequency", "savings_trend", "top5_spending"],
   savings:  ["savings"],
   fixed:    ["fixed_expenses"],
   variable: ["variable_expenses"],
@@ -207,7 +208,9 @@ export default function FinancePage() {
   const [paidFixed, setPaidFixed] = useState<Set<number>>(new Set());
   const [editSaving, setEditSaving] = useState<Saving | null>(null);
   const [varSearch, setVarSearch] = useState("");
-  const [fixedOrder, setFixedOrder] = useState<number[]>([]);
+  const [fixedOrder, setFixedOrder]           = useState<number[]>([]);
+  const [top5Month, setTop5Month]             = useState(new Date().toISOString().slice(0, 7));
+  const [top5Variable, setTop5Variable]       = useState<VarExpense[]>([]);
 
   useEffect(() => {
     try {
@@ -265,6 +268,18 @@ export default function FinancePage() {
       .then(d => setVarMonthData(d))
       .catch(e => console.error("varMonth fetch:", e));
   }, [varMonth]);
+
+  useEffect(() => {
+    apiFetch<VarExpense[]>(`/finance/variable?month=${top5Month}`)
+      .then(v => {
+        const sorted = [...v]
+          .filter(x => parseAmt(x.amount) > 0)
+          .sort((a, b) => parseAmt(b.amount) - parseAmt(a.amount))
+          .slice(0, 5);
+        setTop5Variable(sorted);
+      })
+      .catch(() => setTop5Variable([]));
+  }, [top5Month]);
 
   function getColWidth(): number {
     if (!gridRef.current) return 200;
@@ -858,6 +873,74 @@ export default function FinancePage() {
             <input value={newFixed.cost} onChange={e => setNewFixed(p => ({ ...p, cost: e.target.value }))} placeholder="Cost" type="number" step="0.01" style={{ ...inputStyle, width: 100 }} className="cyber-input" />
             <input value={newFixed.comments} onChange={e => setNewFixed(p => ({ ...p, comments: e.target.value }))} placeholder="Notes" style={{ ...inputStyle, width: 120 }} className="cyber-input" />
             <button onClick={addFixed} className="btn-primary" style={{ fontSize: 13, whiteSpace: "nowrap" }}>Add</button>
+          </div>
+        </div>
+      </div>
+    ),
+
+    top5_spending: (
+      <div className="glass" style={{ padding: "24px", height: "100%", display: "flex", flexDirection: "column", boxSizing: "border-box", position: "relative" }}>
+        <div style={{ position: "absolute", top: 0, left: 24, right: 24, height: 1, background: "linear-gradient(90deg, transparent, var(--orange), transparent)", opacity: 0.6 }} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div className="label-cyan">◉ Top 5 Spent</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button
+              onClick={() => setTop5Month(prev => {
+                const [y, m] = prev.split("-").map(Number);
+                const d = new Date(y, m - 2, 1);
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+              })}
+              style={{ background: "transparent", border: "none", color: "var(--text-3)", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 4px", transition: "color 0.15s" }}
+              onMouseEnter={e => (e.currentTarget.style.color = "var(--cyan)")}
+              onMouseLeave={e => (e.currentTarget.style.color = "var(--text-3)")}
+            >‹</button>
+            <span style={{ fontFamily: "var(--font-space)", fontSize: 11, fontWeight: 600, color: "var(--text-2)", letterSpacing: "0.04em" }}>
+              {formatMonthFull(top5Month)}
+            </span>
+            <button
+              onClick={() => setTop5Month(prev => {
+                const [y, m] = prev.split("-").map(Number);
+                const d = new Date(y, m, 1);
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+              })}
+              style={{ background: "transparent", border: "none", color: "var(--text-3)", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 4px", transition: "color 0.15s" }}
+              onMouseEnter={e => (e.currentTarget.style.color = "var(--cyan)")}
+              onMouseLeave={e => (e.currentTarget.style.color = "var(--text-3)")}
+            >›</button>
+          </div>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+          <div className={finHidden}>
+            {top5Variable.length === 0 ? (
+              <p style={{ color: "var(--text-3)", fontSize: 13 }}>No expenses in {formatMonthFull(top5Month)}.</p>
+            ) : (
+              <div className="finance-blur" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {top5Variable.map((exp, i) => {
+                  const amt = parseAmt(exp.amount);
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                      <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-3)", width: 14, flexShrink: 0, paddingTop: 3 }}>{i + 1}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                          <span style={{ fontSize: 13, color: "var(--text-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {exp.description || "—"}
+                          </span>
+                          <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 600, color: "var(--orange)", flexShrink: 0 }}>
+                            {cur} {amt.toFixed(2)}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+                          <span style={{ background: "rgba(34,211,238,0.1)", borderRadius: 4, padding: "1px 6px", fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--cyan)", letterSpacing: "0.05em" }}>
+                            {exp.category}
+                          </span>
+                          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-3)" }}>{exp.date}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>

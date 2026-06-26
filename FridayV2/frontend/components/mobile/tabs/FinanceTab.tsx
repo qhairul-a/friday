@@ -395,6 +395,46 @@ export default function FinanceTab() {
         ))}
       </div>
 
+      {/* ── Top 5 Spent (current month, derived from loaded variable data) ── */}
+      {(() => {
+        const top5 = [...variable]
+          .filter(v => parseAmt(v.amount) > 0)
+          .sort((a, b) => parseAmt(b.amount) - parseAmt(a.amount))
+          .slice(0, 5);
+        if (top5.length === 0) return null;
+        return (
+          <>
+            <div style={SECTION}>Top 5 Spent — {fmtMonth(month)}</div>
+            <div style={CARD}>
+              {top5.map((v, i) => (
+                <div key={v._index} style={{
+                  display: "flex", alignItems: "flex-start", gap: 8,
+                  paddingBottom: i < top5.length - 1 ? 8 : 0,
+                  marginBottom: i < top5.length - 1 ? 8 : 0,
+                  borderBottom: i < top5.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+                }}>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-3)", paddingTop: 2, width: 12, flexShrink: 0 }}>{i + 1}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6 }}>
+                      <p style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {v.description}
+                      </p>
+                      <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: "var(--orange)", flexShrink: 0 }}>
+                        {visible ? parseAmt(v.amount).toFixed(2) : "••••"}
+                      </span>
+                    </div>
+                    <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-3)" }}>
+                      <span style={{ background: "rgba(34,211,238,0.1)", borderRadius: 3, padding: "1px 5px", color: "var(--cyan)", marginRight: 4 }}>{v.category}</span>
+                      {v.date}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        );
+      })()}
+
     </div>
   );
 }

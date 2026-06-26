@@ -23,12 +23,13 @@ const GRID_GAP    = 20;
 const MIN_HEIGHT  = 120;
 const MAX_HEIGHT  = 1400;
 
-const DEFAULT_ORDER = ["upcoming_events", "world_clock", "tasks_due", "routines", "fitness_snapshot", "last_expense", "weather"];
+const DEFAULT_ORDER = ["upcoming_events", "world_clock", "tasks_due", "routines", "fitness_snapshot", "last_expense", "top5_spending", "weather"];
 const DEFAULT_SPANS: Record<string, number> = {
   upcoming_events: 4, world_clock: 2,
   tasks_due: 3,       routines: 3,
   fitness_snapshot: 3, last_expense: 3,
   weather: 3,
+  top5_spending: 3,
 };
 
 const DEFAULT_HEIGHTS: Record<string, number> = {
@@ -39,6 +40,7 @@ const DEFAULT_HEIGHTS: Record<string, number> = {
   fitness_snapshot: 220,
   last_expense:     220,
   weather:          220,
+  top5_spending:    300,
 };
 
 interface WeatherData {
@@ -214,6 +216,8 @@ export default function OverviewPage() {
     } catch { return [{ city: "Singapore", tz: "Asia/Singapore" }]; }
   });
   const [, setTick]               = useState(0);
+  const [top5Month, setTop5Month]       = useState(new Date().toISOString().slice(0, 7));
+  const [top5Expenses, setTop5Expenses] = useState<VarExpense[]>([]);
   const [addingCity, setAddingCity]   = useState(false);
   const [editCityIdx, setEditCityIdx] = useState<number | null>(null);
   const [hoveredCity, setHoveredCity] = useState<number | null>(null);
@@ -305,6 +309,21 @@ export default function OverviewPage() {
   }
 
   useEffect(() => { requestLocation(); }, []);
+
+  useEffect(() => {
+    apiFetch<VarExpense[]>(`/finance/variable?month=${top5Month}`)
+      .then(v => {
+        const sorted = [...v]
+          .filter(x => !isNaN(parseFloat(String(x.amount).replace(/[$,]/g, ""))))
+          .sort((a, b) =>
+            parseFloat(String(b.amount).replace(/[$,]/g, "")) -
+            parseFloat(String(a.amount).replace(/[$,]/g, ""))
+          )
+          .slice(0, 5);
+        setTop5Expenses(sorted);
+      })
+      .catch(() => setTop5Expenses([]));
+  }, [top5Month]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -697,6 +716,73 @@ export default function OverviewPage() {
             ))}
           </div>
         ) : <p style={{ color: "var(--text-3)", fontSize: 13 }}>No routines — add some via Friday.</p>}
+      </Widget>
+    ),
+
+    top5_spending: (
+      <Widget title="◉ Top 5 Spent" accent="var(--orange)"
+        headerRight={
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button
+              onClick={() => setTop5Month(prev => {
+                const [y, m] = prev.split("-").map(Number);
+                const d = new Date(y, m - 2, 1);
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+              })}
+              style={{ background: "transparent", border: "none", color: "var(--text-3)", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 4px", transition: "color 0.15s" }}
+              onMouseEnter={e => (e.currentTarget.style.color = "var(--cyan)")}
+              onMouseLeave={e => (e.currentTarget.style.color = "var(--text-3)")}
+            >‹</button>
+            <span style={{ fontFamily: "var(--font-space)", fontSize: 11, fontWeight: 600, color: "var(--text-2)", letterSpacing: "0.04em" }}>
+              {(() => {
+                const [y, m] = top5Month.split("-");
+                const mn = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+                return `${mn[parseInt(m) - 1]} ${y}`;
+              })()}
+            </span>
+            <button
+              onClick={() => setTop5Month(prev => {
+                const [y, m] = prev.split("-").map(Number);
+                const d = new Date(y, m, 1);
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+              })}
+              style={{ background: "transparent", border: "none", color: "var(--text-3)", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 4px", transition: "color 0.15s" }}
+              onMouseEnter={e => (e.currentTarget.style.color = "var(--cyan)")}
+              onMouseLeave={e => (e.currentTarget.style.color = "var(--text-3)")}
+            >›</button>
+          </div>
+        }
+      >
+        {top5Expenses.length === 0 ? (
+          <p style={{ color: "var(--text-3)", fontSize: 13 }}>No expenses this month.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {top5Expenses.map((exp, i) => {
+              const amt = parseFloat(String(exp.amount).replace(/[$,]/g, ""));
+              return (
+                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-3)", width: 14, flexShrink: 0, paddingTop: 3 }}>{i + 1}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                      <span style={{ fontSize: 13, color: "var(--text-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {exp.description || "—"}
+                      </span>
+                      <span className={`${financeVisible ? "" : "finance-hidden"} finance-blur`} style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 600, color: "var(--orange)", flexShrink: 0 }}>
+                        SGD {isNaN(amt) ? "—" : amt.toFixed(2)}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+                      <span style={{ background: "rgba(34,211,238,0.1)", borderRadius: 4, padding: "1px 6px", fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--cyan)", letterSpacing: "0.05em" }}>
+                        {exp.category}
+                      </span>
+                      <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-3)" }}>{exp.date}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </Widget>
     ),
 
