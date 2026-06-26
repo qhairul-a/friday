@@ -1,7 +1,7 @@
 """
 Briefings — DB CRUD + message builder.
 Each briefing defines a time, enabled flag, and a list of content sections
-(weather, calendar, tasks, routines, fitness, finance).
+(weather, calendar, tasks, routines, finance).
 """
 
 import logging
@@ -13,7 +13,7 @@ from core.supabase_client import get_supabase
 
 logger = logging.getLogger(__name__)
 
-VALID_SECTIONS = {"weather", "calendar", "tasks", "routines", "fitness", "finance"}
+VALID_SECTIONS = {"weather", "calendar", "tasks", "routines", "finance"}
 
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
@@ -159,37 +159,6 @@ def _section_routines() -> str:
         return "🔁 *Routines* — unavailable"
 
 
-def _section_fitness() -> str:
-    try:
-        today = _today()
-        row = get_supabase().table("fitness_daily").select(
-            "steps,sleep_duration_min,hrv_score,body_battery_low,body_battery_high,resting_hr"
-        ).eq("date", today).maybe_single().execute().data
-        if not row:
-            return "⬡ *Fitness* — no data yet today"
-        parts = []
-        if row.get("steps"):
-            parts.append(f"Steps: {row['steps']:,}")
-        if row.get("sleep_duration_min"):
-            h, m = divmod(row["sleep_duration_min"], 60)
-            parts.append(f"Sleep: {h}h {m}m")
-        if row.get("hrv_score"):
-            parts.append(f"HRV: {row['hrv_score']} ms")
-        if row.get("body_battery_high"):
-            parts.append(f"Battery: {row.get('body_battery_low','?')}–{row['body_battery_high']}")
-        if row.get("resting_hr"):
-            parts.append(f"HR: {row['resting_hr']} bpm")
-        if not parts:
-            return "⬡ *Fitness* — no data yet today"
-        lines = ["⬡ *Fitness*"]
-        for p in parts:
-            lines.append(f"  · {p}")
-        return "\n".join(lines)
-    except Exception as e:
-        logger.warning("Fitness section failed: %s", e)
-        return "⬡ *Fitness* — unavailable"
-
-
 def _section_finance() -> str:
     try:
         from integrations.gsheets import get_all_rows
@@ -220,7 +189,6 @@ _SECTION_BUILDERS = {
     "calendar": _section_calendar,
     "tasks":    _section_tasks,
     "routines": _section_routines,
-    "fitness":  _section_fitness,
     "finance":  _section_finance,
 }
 

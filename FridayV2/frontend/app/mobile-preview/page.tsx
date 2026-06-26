@@ -15,7 +15,6 @@ const TABS = [
   { id: "overview", label: "Overview", icon: "⬡" },
   { id: "plans",    label: "Plans",    icon: "◷" },
   { id: "finance",  label: "Finance",  icon: "◈" },
-  { id: "fitness",  label: "Fitness",  icon: "♡" },
   { id: "notes",    label: "Notes",    icon: "◱" },
 ] as const;
 
@@ -58,12 +57,6 @@ function TabContent({ tab }: { tab: string }) {
       { label: "Fixed total",    val: "SGD 1,840" },
       { label: "Variable (Jun)", val: "SGD 612" },
       { label: "Total spend",    val: "SGD 2,452" },
-    ],
-    fitness: [
-      { label: "Steps",        val: "8,421" },
-      { label: "Sleep",        val: "6.8 hrs" },
-      { label: "HRV",          val: "54 ms" },
-      { label: "Body Battery", val: "72 / 100" },
     ],
     notes: [
       { label: "Project ideas — AI tools", val: "Jun 7" },

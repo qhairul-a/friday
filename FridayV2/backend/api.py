@@ -638,82 +638,6 @@ def toggle_routine(routine_id: str):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-# ─── Fitness ──────────────────────────────────────────────────────────────────
-
-@app.post("/fitness/sync")
-def sync_fitness():
-    try:
-        from integrations.fitness import sync_today
-        result = sync_today()
-        return {"ok": True, "message": result}
-    except Exception as e:
-        logger.exception("Endpoint error")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-@app.get("/fitness/today")
-def get_fitness_today():
-    try:
-        from integrations.fitness import sync_today, _read_row, _today
-        today = _today()
-        row = _read_row(today)
-        if not row:
-            try:
-                sync_today()
-                row = _read_row(today)
-            except Exception as sync_err:
-                logger.warning("Auto-sync on /fitness/today failed: %s", sync_err)
-        if not row:
-            raise HTTPException(status_code=404, detail="No fitness data for today")
-        return row
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("Endpoint error")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-# ─── Garmin auth (2FA / reconnect) ───────────────────────────────────────────
-
-class GarminMFABody(BaseModel):
-    code: str
-
-@app.post("/garmin/request-code")
-def garmin_request_code():
-    """Initiate fresh Garmin login — sends 2FA code to the user's email."""
-    try:
-        from integrations.garmin import request_mfa_code
-        mfa_required = request_mfa_code()
-        if mfa_required:
-            return {"ok": True, "mfa_required": True, "message": "2FA code sent to your Garmin account email. Check your inbox."}
-        return {"ok": True, "mfa_required": False, "message": "Garmin reconnected (no MFA needed)"}
-    except Exception as e:
-        logger.exception("Garmin request-code error")
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.post("/garmin/mfa")
-def garmin_complete_mfa(body: GarminMFABody):
-    """Complete Garmin 2FA with the code from the email."""
-    try:
-        from integrations.garmin import complete_mfa
-        complete_mfa(body.code)
-        return {"ok": True, "message": "Garmin reconnected successfully. Future syncs will work automatically."}
-    except Exception as e:
-        logger.exception("Garmin MFA error")
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.get("/garmin/status")
-def garmin_status():
-    """Check if Garmin tokens are present (does not call the Garmin API)."""
-    from integrations.garmin import settings as _s, _load_tokens_from_supabase
-    token_file = _s.GARMIN_TOKEN_DIR / "garmin_tokens.json"
-    has_local = token_file.exists()
-    has_supabase = bool(_load_tokens_from_supabase())
-    return {"connected": has_local or has_supabase}
-
-
 # ─── Finance ──────────────────────────────────────────────────────────────────
 
 @app.get("/finance/last-expense")
@@ -726,41 +650,6 @@ def finance_last_expense():
     except Exception as e:
         logger.error("finance/last-expense error: %s", e)
         return {"expense": None}
-
-
-# ─── Fitness ──────────────────────────────────────────────────────────────────
-
-@app.get("/fitness/latest")
-def fitness_latest():
-    """Return the most recent health_metrics row."""
-    try:
-        from core.supabase_client import supabase
-        result = supabase.table("health_metrics").select("*").eq("user_id", "default").order("date", desc=True).limit(1).execute()
-        rows = result.data
-        return {"metrics": rows[0] if rows else None}
-    except Exception as e:
-        logger.error("fitness/latest error: %s", e)
-        return {"metrics": None}
-
-
-@app.get("/fitness/trends")
-def fitness_trends(days: int = 14):
-    """Return health_metrics rows for the last N days."""
-    try:
-        from core.supabase_client import supabase
-        from datetime import datetime, timedelta
-        from zoneinfo import ZoneInfo
-        days = min(days, 90)
-        start = (datetime.now(ZoneInfo(settings.TIMEZONE)) - timedelta(days=days - 1)).strftime("%Y-%m-%d")
-        result = supabase.table("health_metrics").select(
-            "date,steps,distance_km,heart_rate_avg,heart_rate_resting,stress_avg,"
-            "sleep_duration_hrs,sleep_deep_hrs,sleep_light_hrs,sleep_rem_hrs,"
-            "body_battery_high,body_battery_low"
-        ).eq("user_id", "default").gte("date", start).order("date").execute()
-        return {"data": result.data}
-    except Exception as e:
-        logger.error("fitness/trends error: %s", e)
-        return {"data": []}
 
 
 # ─── Weather ──────────────────────────────────────────────────────────────────

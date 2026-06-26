@@ -4,7 +4,6 @@ import { useState, useRef } from "react";
 import OverviewTab from "./tabs/OverviewTab";
 import PlansTab from "./tabs/PlansTab";
 import FinanceTab from "./tabs/FinanceTab";
-import FitnessTab from "./tabs/FitnessTab";
 import NotesTab from "./tabs/NotesTab";
 import MobileFloatingControls from "./MobileFloatingControls";
 
@@ -12,7 +11,6 @@ const TABS = [
   { id: "overview", label: "Overview", icon: "⬡" },
   { id: "plans",    label: "Plans",    icon: "◷" },
   { id: "finance",  label: "Finance",  icon: "◈" },
-  { id: "fitness",  label: "Fitness",  icon: "♡" },
   { id: "notes",    label: "Notes",    icon: "◱" },
 ] as const;
 
@@ -125,7 +123,6 @@ export default function MobileSlidePanel({ open, onClose, onDisconnect }: Mobile
         {activeTab === "overview" && <OverviewTab />}
         {activeTab === "plans"    && <PlansTab />}
         {activeTab === "finance"  && <FinanceTab />}
-        {activeTab === "fitness"  && <FitnessTab />}
         {activeTab === "notes"    && <NotesTab />}
       </div>
 

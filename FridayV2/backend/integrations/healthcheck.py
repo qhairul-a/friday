@@ -1,8 +1,7 @@
 """
 Lightweight daily health checks for all Friday integrations.
-Each check is self-contained and safe — no side effects, no Garmin re-auth.
+Each check is self-contained and safe — no side effects.
 """
-import json
 import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -57,26 +56,10 @@ def _check_notes() -> str:
         return f"❌ Notes: {e}"
 
 
-def _check_garmin() -> str:
-    """Check token file only — never calls Garmin API to avoid triggering MFA."""
-    try:
-        token_file = settings.GARMIN_TOKEN_DIR / "garmin_tokens.json"
-        if not token_file.exists():
-            return "❌ Garmin: token missing — run setup_garmin.py"
-        data = json.loads(token_file.read_text())
-        if not data:
-            return "❌ Garmin: token file is empty"
-        return "✅ Garmin (token present)"
-    except json.JSONDecodeError:
-        return "❌ Garmin: token file corrupted"
-    except Exception as e:
-        return f"❌ Garmin: {e}"
-
-
 def _check_supabase() -> str:
     try:
         from core.supabase_client import supabase
-        supabase.table("health_metrics").select("date").limit(1).execute()
+        supabase.table("user_memory").select("id").limit(1).execute()
         return "✅ Supabase"
     except Exception as e:
         return f"❌ Supabase: {e}"
@@ -88,7 +71,6 @@ _CHECKS = [
     _check_calendar,
     _check_tasks,
     _check_notes,
-    _check_garmin,
     _check_supabase,
 ]
 

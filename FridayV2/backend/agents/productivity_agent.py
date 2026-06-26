@@ -1,3 +1,4 @@
+import logging
 import anthropic
 
 from core.config import settings
@@ -12,6 +13,7 @@ from integrations.routines import (
     mark_routine_undone,
 )
 
+logger = logging.getLogger(__name__)
 _client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
 TOOLS = [
@@ -225,6 +227,7 @@ SYSTEM_PROMPT = (
 
 
 def run_productivity_agent(instruction: str) -> str:
+    logger.info("run_productivity_agent called: %s", instruction[:100])
     messages = [{"role": "user", "content": instruction}]
 
     response = _client.messages.create(
@@ -234,17 +237,27 @@ def run_productivity_agent(instruction: str) -> str:
         tools=TOOLS,
         messages=messages,
     )
+    logger.info("productivity_agent initial stop_reason=%s", response.stop_reason)
 
     while response.stop_reason == "tool_use":
         tool_results = []
         for block in response.content:
             if block.type == "tool_use":
+                logger.info("Productivity agent calling tool: %s input=%s", block.name, block.input)
                 fn = _TOOL_FNS.get(block.name)
-                result = fn(block.input) if fn else f"Unknown tool: {block.name}"
+                if fn:
+                    try:
+                        result = fn(block.input)
+                        logger.info("Tool %s returned: %s", block.name, str(result)[:200])
+                    except Exception as exc:
+                        logger.error("Tool %s failed: %s", block.name, exc, exc_info=True)
+                        result = f"Error calling {block.name}: {exc}"
+                else:
+                    result = f"Unknown tool: {block.name}"
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": block.id,
-                    "content": result,
+                    "content": str(result),
                 })
         messages = [
             {"role": "user", "content": instruction},

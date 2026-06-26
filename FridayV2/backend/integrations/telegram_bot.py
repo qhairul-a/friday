@@ -23,8 +23,8 @@ from telegram.ext import (
 
 from core.config import settings
 from agents.friday import run_friday
-from agents.fitness_agent import run_fitness_agent
 from integrations.memory import extract_and_save
+from integrations.healthcheck import check_all
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -73,6 +73,74 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _is_authorized(update):
         return
     await update.message.reply_text("Hey, I'm Friday. What do you need?")
+
+
+async def health_check_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not _is_authorized(update):
+        return
+    await update.message.reply_text("Running checks…")
+    result = await asyncio.to_thread(check_all)
+    await update.message.reply_text(result, parse_mode="Markdown")
+
+
+async def _daily_health_check(context: ContextTypes.DEFAULT_TYPE) -> None:
+    try:
+        result = await asyncio.to_thread(check_all)
+        await context.bot.send_message(
+            chat_id=settings.TELEGRAM_USER_ID,
+            text=result,
+            parse_mode="Markdown",
+        )
+    except Exception as e:
+        logger.error("Daily health check failed: %s", e)
+
+
+async def _weekly_deep_check(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Sunday 09:00 SGT — deeper check including Google token age."""
+    lines = ["🔍 *Weekly Deep Check — Sunday Report*\n"]
+
+    # 1. All standard integration checks
+    try:
+        from integrations.healthcheck import check_all
+        base = await asyncio.to_thread(check_all)
+        # strip the header line, keep individual results
+        for line in base.splitlines()[1:]:
+            lines.append(line)
+    except Exception as e:
+        lines.append(f"❌ Health checks failed: {e}")
+
+    # 2. Google token age check
+    lines.append("")
+    lines.append("*Google OAuth token:*")
+    try:
+        from integrations.gcal import _get_service
+        from google.oauth2.credentials import Credentials
+        from core.config import settings as _s
+        SCOPES = [
+            "https://www.googleapis.com/auth/drive.file",
+            "https://www.googleapis.com/auth/drive.readonly",
+            "https://www.googleapis.com/auth/calendar",
+            "https://www.googleapis.com/auth/tasks",
+        ]
+        creds = Credentials.from_authorized_user_file(str(_s.GDRIVE_TOKEN_FILE), SCOPES)
+        if creds.expired:
+            lines.append("⚠️ Token expired — will auto-refresh on next use")
+        elif creds.valid:
+            lines.append("✅ Token valid")
+        else:
+            lines.append("⚠️ Token state unknown")
+    except Exception as e:
+        lines.append(f"❌ Token check failed: {e}")
+
+    msg = "\n".join(lines)
+    try:
+        await context.bot.send_message(
+            chat_id=settings.TELEGRAM_USER_ID,
+            text=msg,
+            parse_mode="Markdown",
+        )
+    except Exception as e:
+        logger.error("Weekly deep check send failed: %s", e)
 
 
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -132,18 +200,6 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text("Sorry, something went wrong processing your voice message.")
 
 
-async def send_daily_health_push(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Scheduled job: sync Garmin data and send a morning health brief to the user."""
-    try:
-        summary = run_fitness_agent(
-            "Sync today's fitness data, then give me a morning health brief — "
-            "key metrics, sleep quality, recovery state, and one actionable tip for the day."
-        )
-        await context.bot.send_message(chat_id=settings.TELEGRAM_USER_ID, text=summary)
-    except Exception as e:
-        logger.error("Daily health push failed: %s", e)
-
-
 def _schedule_briefing(job_queue, b: dict) -> None:
     """Schedule a single enabled briefing in the job queue."""
     h, m = map(int, b["send_time"].split(":"))
@@ -185,13 +241,19 @@ def build_app():
     app = ApplicationBuilder().token(settings.TELEGRAM_BOT_TOKEN).updater(None).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("clear", clear))
+    app.add_handler(CommandHandler("check", health_check_cmd))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(MessageHandler(filters.VOICE, handle_voice))
 
-    # Daily health push from Garmin (unchanged)
-    h, m = map(int, settings.GARMIN_DAILY_PUSH_TIME.split(":"))
-    push_time = dtime(h, m, tzinfo=ZoneInfo(settings.TIMEZONE))
-    app.job_queue.run_daily(send_daily_health_push, time=push_time)
+    # Daily integration health check at 07:30 SGT
+    app.job_queue.run_daily(_daily_health_check, time=dtime(7, 30, tzinfo=ZoneInfo(settings.TIMEZONE)))
+
+    # Weekly deep check every Sunday at 09:00 SGT
+    app.job_queue.run_daily(
+        _weekly_deep_check,
+        time=dtime(9, 0, tzinfo=ZoneInfo(settings.TIMEZONE)),
+        days=(6,),  # 6 = Sunday
+    )
 
     # Load all enabled briefings from Supabase
     try:

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { supabase } from "@/lib/supabase";
 import { apiFetch } from "@/lib/api";
 import { useFinanceVisibility } from "@/lib/finance-visibility";
 import {
@@ -23,24 +22,22 @@ const GRID_GAP    = 20;
 const MIN_HEIGHT  = 120;
 const MAX_HEIGHT  = 1400;
 
-const DEFAULT_ORDER = ["upcoming_events", "world_clock", "tasks_due", "routines", "fitness_snapshot", "last_expense", "top5_spending", "weather"];
+const DEFAULT_ORDER = ["upcoming_events", "world_clock", "tasks_due", "routines", "last_expense", "top5_spending", "weather"];
 const DEFAULT_SPANS: Record<string, number> = {
   upcoming_events: 4, world_clock: 2,
   tasks_due: 3,       routines: 3,
-  fitness_snapshot: 3, last_expense: 3,
-  weather: 3,
+  last_expense: 3,    weather: 3,
   top5_spending: 3,
 };
 
 const DEFAULT_HEIGHTS: Record<string, number> = {
-  upcoming_events:  440,
-  world_clock:      220,
-  tasks_due:        220,
-  routines:         220,
-  fitness_snapshot: 220,
-  last_expense:     220,
-  weather:          220,
-  top5_spending:    300,
+  upcoming_events: 440,
+  world_clock:     220,
+  tasks_due:       220,
+  routines:        220,
+  last_expense:    220,
+  weather:         220,
+  top5_spending:   300,
 };
 
 interface WeatherData {
@@ -203,7 +200,6 @@ export default function OverviewPage() {
   const [weather, setWeather]         = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError]     = useState<string | null>(null);
-  const [fitness, setFitness]     = useState<Record<string, number | null> | null>(null);
   const [events, setEvents]       = useState<CalEvent[]>([]);
   const [tasks, setTasks]         = useState<Task[]>([]);
   const [lastExp, setLastExp]     = useState<VarExpense | null>(null);
@@ -251,18 +247,6 @@ export default function OverviewPage() {
   }, []);
 
   const load = useCallback(async () => {
-    const d = new Date();
-    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    // Wrapped in try/catch — if Supabase is unreachable, backend calls must still run
-    try {
-      const { data } = await supabase
-        .from("fitness_daily")
-        .select("steps,sleep_duration_min,hrv_score,calories")
-        .eq("date", today)
-        .maybeSingle();
-      setFitness(data as Record<string, number | null> | null);
-    } catch { /* supabase offline */ }
-
     try { const t = await apiFetch<Task[]>("/tasks"); setTasks(t.filter(t => t.status === "needsAction")); } catch { /* offline */ }
     try {
       const v = await apiFetch<VarExpense[]>("/finance/variable");
@@ -444,36 +428,9 @@ export default function OverviewPage() {
   const usedTzs        = new Set(cities.map(c => c.tz));
   const availableCities = ALL_CITIES.filter(c => !usedTzs.has(c.tz));
 
-  // ── Sleep formatting ───────────────────────────────────────────────────────
-  const sleepH = fitness?.sleep_duration_min ? Math.floor(fitness.sleep_duration_min / 60) : null;
-  const sleepM = fitness?.sleep_duration_min ? fitness.sleep_duration_min % 60 : null;
-
   const { visible: financeVisible } = useFinanceVisibility();
 
   const widgets: Record<string, React.ReactNode> = {
-
-    fitness_snapshot: (
-      <Widget title="⬡ Fitness Snapshot">
-        {fitness ? (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            {[
-              { label: "Steps",    value: fitness.steps?.toLocaleString(),                   unit: ""    },
-              { label: "Sleep",    value: sleepH !== null ? `${sleepH}h ${sleepM}m` : null, unit: ""    },
-              { label: "HRV",     value: fitness.hrv_score,                                unit: "ms"  },
-              { label: "Calories", value: fitness.calories?.toLocaleString(),               unit: "kcal"},
-            ].map(({ label, value, unit }) => (
-              <div key={label}>
-                <div className="label" style={{ marginBottom: 4, color: "var(--text-2)" }}>{label}</div>
-                <span className="metric-value" style={{ fontSize: 22 }}>{value ?? "—"}</span>
-                {value != null && unit && <span className="metric-unit">{unit}</span>}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p style={{ color: "var(--text-3)", fontSize: 13 }}>No data today — sync from Fitness page.</p>
-        )}
-      </Widget>
-    ),
 
     upcoming_events: (
       <Widget title="◷ Calendar" accent="var(--violet)">

@@ -4,15 +4,17 @@ Receives user input, routes to sub-agents via tool_use, returns a final response
 """
 
 import re
+import logging
 import anthropic
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from core.config import settings
+
+logger = logging.getLogger(__name__)
 from agents.notes_agent import run_notes_agent
 from agents.productivity_agent import run_productivity_agent
 from agents.research_agent import run_research_agent
 from agents.finance_agent import run_finance_agent
-from agents.fitness_agent import run_fitness_agent
 from agents.navigation_agent import run_navigation_agent
 from integrations.memory import load_memory
 
@@ -39,7 +41,6 @@ You have access to sub-agents that handle specialised tasks:
 - **productivity_agent**: View, create, find, or delete Google Calendar events. Add, complete, update, or delete Google Tasks. Add, list, edit, delete, and mark done/undone daily routines (recurring habits like "morning workout").
 - **research_agent**: Search the web for information on any topic. Use when the user asks to research, look up, find out about, or search for something online.
 - **finance_agent**: Manage fixed and variable expenses in Google Sheets. Get financial summaries and analytics.
-- **fitness_agent**: Fetch and analyse Garmin fitness metrics. Get health summaries, trends, and coaching advice.
 - **navigation_agent**: Get Google Maps directions to any destination. Only the destination name is needed — nothing else.
 
 IMPORTANT — navigation rules (never break these):
@@ -134,24 +135,6 @@ TOOLS = [
         },
     },
     {
-        "name": "fitness_agent",
-        "description": (
-            "Fetch and analyse Garmin fitness metrics, and provide health coaching insights. "
-            "Use this when the user asks about steps, sleep, HRV, body battery, stress, VO2 max, "
-            "recent workouts, fitness trends, recovery, or general health."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "instruction": {
-                    "type": "string",
-                    "description": "Clear natural-language instruction, e.g. 'Get today's health summary' or 'How has my sleep been this week?'",
-                }
-            },
-            "required": ["instruction"],
-        },
-    },
-    {
         "name": "navigation_agent",
         "description": (
             "Get Google Maps directions to a destination and return a tappable link. "
@@ -204,7 +187,6 @@ _AGENT_FNS = {
     "productivity_agent": lambda args: run_productivity_agent(args["instruction"]),
     "research_agent": lambda args: run_research_agent(args["query"]),
     "finance_agent": lambda args: run_finance_agent(args["instruction"]),
-    "fitness_agent": lambda args: run_fitness_agent(args["instruction"]),
     "navigation_agent": lambda args: run_navigation_agent(args["destination"], args.get("mode", "driving")),
 }
 
@@ -251,12 +233,21 @@ def run_friday(user_input: str, history: list[dict]) -> tuple[str, list[dict]]:
         tool_results = []
         for block in response.content:
             if block.type == "tool_use":
+                logger.info("Friday dispatching tool: %s input=%s", block.name, block.input)
                 fn = _AGENT_FNS.get(block.name)
-                result = fn(block.input) if fn else f"Unknown agent: {block.name}"
+                if fn:
+                    try:
+                        result = fn(block.input)
+                        logger.info("Tool %s returned: %s", block.name, str(result)[:200])
+                    except Exception as exc:
+                        logger.error("Agent %s failed: %s", block.name, exc, exc_info=True)
+                        result = f"Error from {block.name}: {exc}"
+                else:
+                    result = f"Unknown agent: {block.name}"
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": block.id,
-                    "content": result,
+                    "content": str(result),
                 })
 
         messages = messages + [

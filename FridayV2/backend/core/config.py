@@ -32,12 +32,6 @@ class Settings(BaseSettings):
     FINANCE_FOLDER_ID: str = "1Ei0A9dlWroT_V5WAzjE9IjPzHhM0c7Zm"
     CURRENCY: str = "SGD"
 
-    # Garmin
-    GARMIN_EMAIL: str = ""
-    GARMIN_PASSWORD: str = ""
-    GARMIN_TOKEN_DIR: Path = BASE_DIR / "secrets" / "garmin_tokens"
-    GARMIN_DAILY_PUSH_TIME: str = "08:00"
-
     # Google
     GOOGLE_CLIENT_SECRET_FILE: Path = BASE_DIR / "secrets" / "google-client-secret.json"
     GDRIVE_TOKEN_FILE: Path = BASE_DIR / "secrets" / "gdrive_token.json"

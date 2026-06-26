@@ -47,6 +47,26 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
 
+
+def _materialize_secrets() -> None:
+    """Write Google credential env vars to /app/secrets/ — mirrors what startup.sh does for the main service."""
+    import base64
+    from pathlib import Path
+
+    secrets_dir = Path(os.environ.get("SECRETS_DIR", "/app/secrets"))
+    secrets_dir.mkdir(parents=True, exist_ok=True)
+
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET_JSON", "")
+    if client_secret:
+        (secrets_dir / "google-client-secret.json").write_text(client_secret)
+
+    token_json = os.environ.get("GDRIVE_TOKEN_JSON", "")
+    if token_json:
+        (secrets_dir / "gdrive_token.json").write_text(token_json)
+
+
+_materialize_secrets()
+
 from livekit import rtc
 from livekit.agents import AgentSession, Agent, function_tool, JobContext, WorkerOptions, cli, room_io
 from livekit.plugins import deepgram, anthropic
@@ -73,7 +93,6 @@ from integrations.finance import (
     list_variable_expenses, add_variable_expense, edit_variable_expense,
     delete_variable_expense, get_financial_summary,
 )
-from integrations.fitness import get_daily_summary, get_weekly_trends, get_recent_activities
 from integrations.memory import load_memory
 
 
@@ -109,7 +128,6 @@ Capabilities:
 - Tasks: list, create, complete, update, delete Google Tasks.
 - Routines: list, add, edit, delete routines; mark done or undone.
 - Finance: list/add/edit/delete fixed and variable expenses; get financial summary with trends.
-- Fitness: today's health snapshot (steps, sleep, HRV, body battery, stress); weekly trends; recent workouts.
 - Web search: search the web for current events, news, facts, or any question. Always use this for anything outside your knowledge — never refuse.
 - Navigation: get Google Maps directions to any destination — sends a tappable link to Telegram.
 
@@ -124,11 +142,6 @@ Finance rules:
 - Fixed expenses are recurring monthly costs (subscriptions, rent, bills).
 - When logging an expense, always confirm amount, category, and date with the user first.
 - Currency is {currency}.
-
-Fitness rules:
-- get_daily_summary syncs Garmin data automatically for today. Call it for any health question.
-- For trends or weekly analysis, call get_weekly_trends.
-- Speak naturally with actual numbers — no bullet points.
 
 Web search rules:
 - Always call search_web for current events, prices, news, recommendations, or anything time-sensitive.
@@ -348,23 +361,6 @@ class FridayVoiceAgent(Agent):
     async def tool_delete_fixed_expense(self, query: str) -> str:
         """Delete a fixed expense by partial item name. Always confirm with the user first."""
         return await asyncio.to_thread(delete_fixed_expense, query)
-
-    # ── Fitness ────────────────────────────────────────────────────────────────
-
-    @function_tool
-    async def tool_get_health_today(self, date: str = "") -> str:
-        """Get today's health snapshot: steps, sleep, HRV, body battery, stress, calories. Auto-syncs from Garmin."""
-        return await asyncio.to_thread(get_daily_summary, date or None)
-
-    @function_tool
-    async def tool_get_health_trends(self, days: int = 7) -> str:
-        """Get averaged health trends for the last N days. Use for weekly/monthly analysis."""
-        return await asyncio.to_thread(get_weekly_trends, days)
-
-    @function_tool
-    async def tool_get_recent_workouts(self, count: int = 5) -> str:
-        """Get the last N workouts from Garmin."""
-        return await asyncio.to_thread(get_recent_activities, count)
 
     # ── Navigation ─────────────────────────────────────────────────────────────
 

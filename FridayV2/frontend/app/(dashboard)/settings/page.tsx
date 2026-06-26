@@ -6,7 +6,6 @@ import { apiFetch } from "@/lib/api";
 
 const HIDDEN_KEY = "hidden_overview";
 const OVERVIEW_WIDGETS = [
-  { id: "fitness_snapshot", label: "Fitness Snapshot",  icon: "⬡" },
   { id: "upcoming_events",  label: "Upcoming Events",   icon: "◷" },
   { id: "tasks_due",        label: "Open Tasks",        icon: "◈" },
   { id: "last_expense",     label: "Last Expense",      icon: "◉" },
@@ -17,7 +16,6 @@ const ALL_SECTIONS = [
   { id: "calendar", icon: "📅", label: "Calendar" },
   { id: "tasks",    icon: "✅", label: "Tasks"    },
   { id: "routines", icon: "🔁", label: "Routines" },
-  { id: "fitness",  icon: "⬡", label: "Fitness"  },
   { id: "finance",  icon: "💰", label: "Finance"  },
 ];
 
