@@ -45,9 +45,9 @@ window.IFL.filters = (function () {
     const allCws = IFL.store.allCws();
     const maxIdx = Math.max(0, allCws.length - 1);
 
-    // Clamp stored indices to new range
+    // Clamp stored indices to new range; always expand max to cover new data
     state.cwMin = Math.min(state.cwMin, maxIdx);
-    state.cwMax = state.cwMax === 0 ? maxIdx : Math.min(state.cwMax, maxIdx);
+    if (state.cwMax === 0 || state.cwMax > maxIdx) state.cwMax = maxIdx;
 
     // CW sliders
     const slMin = document.getElementById('cw-min');
@@ -57,6 +57,7 @@ window.IFL.filters = (function () {
     document.getElementById('cw-min-label').textContent = allCws[state.cwMin] || '—';
     document.getElementById('cw-max-label').textContent = allCws[state.cwMax] || '—';
 
+    // Assign directly (replaces previous handler — no listener accumulation)
     slMin.oninput = () => {
       state.cwMin = Math.min(parseInt(slMin.value), state.cwMax);
       slMin.value = state.cwMin;
