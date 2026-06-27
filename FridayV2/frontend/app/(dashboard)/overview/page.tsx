@@ -815,7 +815,7 @@ export default function OverviewPage() {
     ),
   };
 
-  const visible = order.filter(id => !hidden.includes(id));
+  const visible = order.filter(id => !hidden.includes(id) && id in widgets);
 
   return (
     <div>
