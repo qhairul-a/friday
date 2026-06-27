@@ -625,6 +625,15 @@ export default function FinancePage() {
                     <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={50} />
                     <Tooltip contentStyle={tooltipStyle} formatter={(v) => typeof v === "number" ? `${cur} ${v.toFixed(2)}` : ""} />
                     <Bar dataKey="total" fill="var(--cyan)" radius={[3, 3, 0, 0]} />
+                    {totalPerMonthData.length > 0 && (
+                      <ReferenceLine
+                        y={Math.round(totalPerMonthData.reduce((s, d) => s + d.total, 0) / totalPerMonthData.length * 100) / 100}
+                        stroke="var(--orange)"
+                        strokeDasharray="4 3"
+                        strokeWidth={1.5}
+                        label={{ value: `avg ${cur} ${(Math.round(totalPerMonthData.reduce((s, d) => s + d.total, 0) / totalPerMonthData.length * 100) / 100).toFixed(0)}`, position: "insideTopRight", fill: "var(--orange)", fontSize: 9, fontFamily: "var(--font-mono)" }}
+                      />
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
