@@ -6,6 +6,12 @@ window.IFL.pages.dealers = (function () {
   let _sortCol = 'kpi';
   let _sortDir = 1; // 1=asc, -1=desc
 
+  function esc(str) {
+    return (str == null ? '' : String(str))
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
   function render(container, filters) {
     const filtered = IFL.store.filter(filters).filter(s => s.dealer);
     if (!filtered.length) {
@@ -39,7 +45,7 @@ window.IFL.pages.dealers = (function () {
 
     const tableRows = rows.map(r => `
       <tr class="dealer-row" data-dealer="${encodeURIComponent(r.name)}">
-        <td>${r.name}</td>
+        <td>${esc(r.name)}</td>
         <td>${r.total}</td>
         <td style="color:var(--green)">${r.achieved}</td>
         <td style="color:var(--red)">${r.notAchieved}</td>
@@ -73,7 +79,7 @@ window.IFL.pages.dealers = (function () {
       th.style.cursor = 'pointer';
       th.onclick = () => {
         const col = th.dataset.col;
-        if (_sortCol === col) _sortDir *= -1; else { _sortCol = col; _sortDir = -1; }
+        if (_sortCol === col) _sortDir *= -1; else { _sortCol = col; _sortDir = 1; }
         render(container, filters);
       };
     });
@@ -100,13 +106,13 @@ window.IFL.pages.dealers = (function () {
     const rows = shipments.map(s => {
       const ok = useAfter ? s.achievedAfter : s.achievedBefore;
       return `<tr>
-        <td>${s.date || '—'}</td>
-        <td>${s.cw}</td>
-        <td>${s.vin || '—'}</td>
-        <td>${s.kpiDeadline || '—'}</td>
-        <td>${s.deliveredOn || '—'}</td>
+        <td>${esc(s.date) || '—'}</td>
+        <td>${esc(s.cw)}</td>
+        <td>${esc(s.vin) || '—'}</td>
+        <td>${esc(s.kpiDeadline) || '—'}</td>
+        <td>${esc(s.deliveredOn) || '—'}</td>
         <td><span class="status-badge ${ok ? 'badge-green' : 'badge-red'}">${ok ? 'Achieved' : 'Failed'}</span></td>
-        <td style="font-size:11px;color:var(--text-muted)">${s.remarks || ''}</td>
+        <td style="font-size:11px;color:var(--text-muted)">${esc(s.remarks)}</td>
       </tr>`;
     }).join('');
     return `<table class="data-table" style="font-size:12px">
