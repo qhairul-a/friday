@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IFL KPI Dashboard</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<nav id="sidebar">
+  <div class="sidebar-logo"><span class="ifl-text">IFL</span> KPI</div>
+  <div class="nav-item active" data-page="overview">
+    <span class="nav-icon">📊</span><span class="nav-label">Overview</span>
+  </div>
+  <div class="nav-item" data-page="regions">
+    <span class="nav-icon">🌏</span><span class="nav-label">By Region</span>
+  </div>
+  <div class="nav-item" data-page="hubs">
+    <span class="nav-icon">🏭</span><span class="nav-label">By Hub</span>
+  </div>
+  <div class="nav-item" data-page="dealers">
+    <span class="nav-icon">🏪</span><span class="nav-label">Dealers</span>
+  </div>
+  <div class="nav-item" data-page="trucks">
+    <span class="nav-icon">🚛</span><span class="nav-label">Trucks & On-Deck</span>
+  </div>
+  <div class="sidebar-spacer"></div>
+  <div class="nav-item" data-page="upload">
+    <span class="nav-icon">📁</span><span class="nav-label">Upload Data</span>
+    <span class="nav-dot" id="data-dot"></span>
+  </div>
+</nav>
+
+<div id="main">
+  <div id="filter-bar">
+    <div class="filter-group">
+      <span class="filter-label">Weeks</span>
+      <div class="cw-range">
+        <input type="range" id="cw-min" min="0" max="0" value="0">
+        <span class="cw-label" id="cw-min-label">—</span>
+        <span style="font-size:11px;color:var(--text-muted)">to</span>
+        <span class="cw-label" id="cw-max-label">—</span>
+        <input type="range" id="cw-max" min="0" max="0" value="0">
+      </div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Region</span>
+      <div id="region-chips"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Hub</span>
+      <div id="hub-chips"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Type</span>
+      <div id="type-chips"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Investigation</span>
+      <div class="inv-toggle">
+        <div class="inv-btn active" id="inv-before">Before</div>
+        <div class="inv-btn" id="inv-after">After</div>
+      </div>
+    </div>
+    <div class="filter-group">
+      <span class="chip disabled" title="Coming soon — no data yet">DG ▾</span>
+      <span class="chip disabled" title="Coming soon — no data yet">Duty ▾</span>
+    </div>
+  </div>
+
+  <div id="page-container">
+    <div class="page active" id="page-overview"></div>
+    <div class="page" id="page-regions"></div>
+    <div class="page" id="page-hubs"></div>
+    <div class="page" id="page-dealers"></div>
+    <div class="page" id="page-trucks"></div>
+    <div class="page" id="page-upload"></div>
+  </div>
+</div>
+
+<script src="assets/xlsx.min.js"></script>
+<script src="assets/chart.min.js"></script>
+<script src="assets/parser.js"></script>
+<script src="assets/store.js"></script>
+<script src="assets/filters.js"></script>
+<script src="assets/charts.js"></script>
+<script src="assets/pages/upload.js"></script>
+<script src="assets/pages/overview.js"></script>
+<script src="assets/pages/regions.js"></script>
+<script src="assets/pages/hubs.js"></script>
+<script src="assets/pages/dealers.js"></script>
+<script src="assets/pages/trucks.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
