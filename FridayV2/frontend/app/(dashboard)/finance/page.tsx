@@ -680,6 +680,15 @@ export default function FinancePage() {
                       <Bar dataKey="count" fill="var(--cyan)" radius={[3, 3, 0, 0]}>
                         <LabelList dataKey="count" position="top" style={{ fill: "var(--text-3)", fontSize: 9, fontFamily: "var(--font-mono)" }} />
                       </Bar>
+                      {countData.length > 0 && (
+                        <ReferenceLine
+                          y={Math.round(countData.reduce((s, d) => s + d.count, 0) / countData.length * 10) / 10}
+                          stroke="var(--orange)"
+                          strokeDasharray="4 3"
+                          strokeWidth={1.5}
+                          label={{ value: `avg ${Math.round(countData.reduce((s, d) => s + d.count, 0) / countData.length * 10) / 10}`, position: "insideTopRight", fill: "var(--orange)", fontSize: 9, fontFamily: "var(--font-mono)" }}
+                        />
+                      )}
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
