@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { apiFetch } from "@/lib/api";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-  PieChart, Pie, Cell, LineChart, Line, Legend, LabelList,
+  PieChart, Pie, Cell, LineChart, Line, Legend, LabelList, ReferenceLine,
 } from "recharts";
 import { useFinanceVisibility } from "@/lib/finance-visibility";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
@@ -22,17 +22,20 @@ const DEFAULT_HEIGHTS: Record<string, number> = {
   summary:             220,
   spending_breakdown:  440,
   spending_trend:      440,
-  spending_frequency:  440,
+  spending_frequency:  660,
   savings_trend:       440,
   top5_spending:       320,
+  mtm_diff:            440,
+  total_per_month:     440,
   savings:             440,
   variable_expenses:   660,
   fixed_expenses:      660,
 };
 const DEFAULT_SPANS: Record<string, number> = {
   summary: 2, spending_breakdown: 1, spending_trend: 2,
-  spending_frequency: 1, savings_trend: 1, top5_spending: 1, savings: 2,
-  variable_expenses: 2, fixed_expenses: 2,
+  spending_frequency: 1, savings_trend: 1, top5_spending: 1,
+  mtm_diff: 1, total_per_month: 1,
+  savings: 2, variable_expenses: 2, fixed_expenses: 2,
 };
 
 type TabId = "overview" | "savings" | "fixed" | "variable";
@@ -43,7 +46,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "variable", label: "Var Exp"   },
 ];
 const TAB_WIDGETS: Record<TabId, string[]> = {
-  overview: ["summary", "spending_breakdown", "spending_trend", "spending_frequency", "savings_trend", "top5_spending"],
+  overview: ["summary", "spending_breakdown", "spending_trend", "spending_frequency", "savings_trend", "top5_spending", "mtm_diff", "total_per_month"],
   savings:  ["savings"],
   fixed:    ["fixed_expenses"],
   variable: ["variable_expenses"],
@@ -429,12 +432,20 @@ export default function FinancePage() {
   const pieData = summary ? Object.entries(summary.by_category).map(([name, value]) => ({ name, value })) : [];
 
   const allMonths = [...new Set(allVariable.map(v => v.date.slice(0, 7)))].sort();
-  const allCategories = [...new Set(allVariable.map(v => v.category))];
+
+  // Deduplicate categories case-insensitively and strip whitespace so "Family" and "family " merge into one line
+  const categoryNormMap = new Map<string, string>();
+  allVariable.forEach(v => {
+    const key = v.category.trim().toLowerCase();
+    if (!categoryNormMap.has(key)) categoryNormMap.set(key, v.category.trim());
+  });
+  const allCategories = [...categoryNormMap.values()];
 
   const trendData = allMonths.map(m => {
     const row: Record<string, number | string> = { month: formatMonth(m) };
     allCategories.forEach(cat => {
-      row[cat] = allVariable.filter(v => v.date.startsWith(m) && v.category === cat)
+      row[cat] = allVariable
+        .filter(v => v.date.startsWith(m) && v.category.trim().toLowerCase() === cat.toLowerCase())
         .reduce((sum, v) => sum + parseAmt(v.amount), 0);
     });
     return row;
@@ -449,6 +460,31 @@ export default function FinancePage() {
     const total = entries.reduce((s, v) => s + parseAmt(v.amount), 0);
     return { month: formatMonth(m), avg: entries.length ? Math.round(total / entries.length * 100) / 100 : 0 };
   });
+
+  const totalPerMonthData = allMonths.map(m => ({
+    month: formatMonth(m),
+    total: Math.round(allVariable.filter(v => v.date.startsWith(m)).reduce((s, v) => s + parseAmt(v.amount), 0) * 100) / 100,
+  }));
+
+  const mtmDiffData = totalPerMonthData.slice(1).map((item, i) => {
+    const prev = totalPerMonthData[i].total;
+    const diff = prev === 0 ? 0 : ((item.total - prev) / prev) * 100;
+    return { month: item.month, diff: Math.round(diff * 10) / 10 };
+  });
+
+  const recentMonths = allMonths.slice(-6);
+  const dailyFreqData = Array.from({ length: 31 }, (_, i) => {
+    const day = i + 1;
+    const entry: Record<string, number | string> = { day: String(day) };
+    recentMonths.forEach(m => {
+      entry[formatMonth(m)] = allVariable.filter(v =>
+        v.date.startsWith(m) && parseInt(v.date.slice(8, 10), 10) === day
+      ).length;
+    });
+    return entry;
+  });
+
+  const MONTH_LINE_COLORS = ["var(--cyan)", "var(--orange)", "var(--violet)", "#10b981", "#f59e0b", "#ef4444"];
 
   const savingsMonths = [...new Set(allSavings.map(s => s.date.slice(0, 7)))].sort();
   const savingsCategories = [...new Set(allSavings.map(s => s.category))];
@@ -598,38 +634,139 @@ export default function FinancePage() {
     spending_frequency: (
       <div className="glass" style={{ padding: "24px" }}>
         <div className="label-cyan" style={{ marginBottom: 12 }}>⬡ Spending Frequency</div>
-        <div className={`${finHidden} finance-blur`} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+        <div className={`${finHidden} finance-blur`} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 16 }}>
         {countData.length > 0 ? (
-          <div style={{ display: "flex", gap: 16, flex: 1, minHeight: 0 }}>
-            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-              <div style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "var(--font-mono)", marginBottom: 4 }}>ENTRY COUNT / MONTH</div>
-              <div style={{ flex: 1, minHeight: 0 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={countData}>
-                    <CartesianGrid {...gridStyle} />
-                    <XAxis dataKey="month" tick={axisStyle} axisLine={false} tickLine={false} />
-                    <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Bar dataKey="count" fill="var(--cyan)" radius={[3, 3, 0, 0]}>
-                      <LabelList dataKey="count" position="top" style={{ fill: "var(--text-3)", fontSize: 9, fontFamily: "var(--font-mono)" }} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+          <>
+            <div style={{ display: "flex", gap: 16, flex: 1, minHeight: 0 }}>
+              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+                <div style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "var(--font-mono)", marginBottom: 4 }}>ENTRY COUNT / MONTH</div>
+                <div style={{ flex: 1, minHeight: 0 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={countData}>
+                      <CartesianGrid {...gridStyle} />
+                      <XAxis dataKey="month" tick={axisStyle} axisLine={false} tickLine={false} />
+                      <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Bar dataKey="count" fill="var(--cyan)" radius={[3, 3, 0, 0]}>
+                        <LabelList dataKey="count" position="top" style={{ fill: "var(--text-3)", fontSize: 9, fontFamily: "var(--font-mono)" }} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+                <div style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "var(--font-mono)", marginBottom: 4 }}>AVG AMOUNT / ENTRY ({cur})</div>
+                <div style={{ flex: 1, minHeight: 0 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={avgData}>
+                      <CartesianGrid {...gridStyle} />
+                      <XAxis dataKey="month" tick={axisStyle} axisLine={false} tickLine={false} />
+                      <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={40} />
+                      <Tooltip contentStyle={tooltipStyle} formatter={(v) => typeof v === "number" ? `${cur} ${v.toFixed(2)}` : ""} />
+                      <Line type="monotone" dataKey="avg" stroke="var(--orange)" strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </div>
-            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-              <div style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "var(--font-mono)", marginBottom: 4 }}>AVG AMOUNT / ENTRY ({cur})</div>
+            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
+              <div style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "var(--font-mono)", marginBottom: 4 }}>DAILY ENTRIES BY MONTH (last {recentMonths.length} months)</div>
               <div style={{ flex: 1, minHeight: 0 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={avgData}>
+                  <LineChart data={dailyFreqData}>
                     <CartesianGrid {...gridStyle} />
-                    <XAxis dataKey="month" tick={axisStyle} axisLine={false} tickLine={false} />
-                    <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={40} />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => typeof v === "number" ? `${cur} ${v.toFixed(2)}` : ""} />
-                    <Line type="monotone" dataKey="avg" stroke="var(--orange)" strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
+                    <XAxis dataKey="day" tick={axisStyle} axisLine={false} tickLine={false} interval={4} />
+                    <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
+                    <Tooltip contentStyle={tooltipStyle} labelFormatter={(label) => `Day ${label}`} />
+                    <Legend iconType="plainline" iconSize={12} wrapperStyle={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-3)", paddingTop: 4 }} />
+                    {recentMonths.map((m, i) => (
+                      <Line
+                        key={m}
+                        type="monotone"
+                        dataKey={formatMonth(m)}
+                        stroke={MONTH_LINE_COLORS[i % MONTH_LINE_COLORS.length]}
+                        strokeWidth={1.5}
+                        dot={false}
+                        activeDot={{ r: 3 }}
+                      />
+                    ))}
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+            </div>
+          </>
+        ) : <p style={{ color: "var(--text-3)", fontSize: 13 }}>No data yet.</p>}
+        </div>
+      </div>
+    ),
+
+    mtm_diff: (
+      <div className="glass" style={{ padding: "24px" }}>
+        <div className="label-cyan" style={{ marginBottom: 12 }}>△ MTM Diff</div>
+        <div className={`${finHidden} finance-blur`} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+        {mtmDiffData.length > 0 ? (
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <div style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "var(--font-mono)", marginBottom: 4 }}>MONTH-OVER-MONTH VARIABLE SPEND %</div>
+            <div style={{ flex: 1, minHeight: 0, height: "calc(100% - 20px)" }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={mtmDiffData}>
+                  <CartesianGrid {...gridStyle} />
+                  <XAxis dataKey="month" tick={axisStyle} axisLine={false} tickLine={false} />
+                  <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={40} tickFormatter={(v) => `${v}%`} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => typeof v === "number" ? [`${v > 0 ? "+" : ""}${v.toFixed(1)}%`, "MoM Change"] : ""} />
+                  <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" strokeDasharray="3 4" />
+                  <Line
+                    type="monotone"
+                    dataKey="diff"
+                    stroke="var(--cyan)"
+                    strokeWidth={2}
+                    dot={(props: any) => {
+                      const { cx, cy, value } = props;
+                      const color = typeof value === "number" && value > 0 ? "#ef4444" : "#10b981";
+                      return <circle key={cx} cx={cx} cy={cy} r={3} fill={color} stroke="none" />;
+                    }}
+                    activeDot={(props: any) => {
+                      const { cx, cy, value } = props;
+                      const color = typeof value === "number" && value > 0 ? "#ef4444" : "#10b981";
+                      return <circle key={cx} cx={cx} cy={cy} r={5} fill={color} stroke="none" />;
+                    }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        ) : <p style={{ color: "var(--text-3)", fontSize: 13 }}>Need at least 2 months of data.</p>}
+        </div>
+      </div>
+    ),
+
+    total_per_month: (
+      <div className="glass" style={{ padding: "24px" }}>
+        <div className="label-cyan" style={{ marginBottom: 12 }}>▦ Total per Month</div>
+        <div className={`${finHidden} finance-blur`} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+        {totalPerMonthData.length > 0 ? (
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <div style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "var(--font-mono)", marginBottom: 4 }}>TOTAL VARIABLE SPEND / MONTH ({cur})</div>
+            <div style={{ flex: 1, minHeight: 0, height: "calc(100% - 20px)" }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={totalPerMonthData}>
+                  <CartesianGrid {...gridStyle} />
+                  <XAxis dataKey="month" tick={axisStyle} axisLine={false} tickLine={false} />
+                  <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={50} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => typeof v === "number" ? `${cur} ${v.toFixed(2)}` : ""} />
+                  <Bar dataKey="total" fill="var(--violet)" radius={[3, 3, 0, 0]}>
+                    <LabelList
+                      dataKey="total"
+                      position="top"
+                      style={{ fill: "var(--text-3)", fontSize: 9, fontFamily: "var(--font-mono)" }}
+                      formatter={(v: any) => {
+                        const n = typeof v === "number" ? v : 0;
+                        return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n));
+                      }}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         ) : <p style={{ color: "var(--text-3)", fontSize: 13 }}>No data yet.</p>}
