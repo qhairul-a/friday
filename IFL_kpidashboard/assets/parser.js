@@ -7,7 +7,10 @@ window.IFL.parser = (function () {
   function excelTimeToStr(value) {
     if (value === null || value === undefined || value === '') return null;
     if (typeof value === 'number') {
-      const totalMinutes = Math.round(value * 24 * 60);
+      // Strip integer part — Excel datetime serials include a date component;
+      // time-only values are pure fractions < 1. % 1 isolates the time fraction.
+      const frac = value % 1;
+      const totalMinutes = Math.round(frac * 24 * 60);
       const h = Math.floor(totalMinutes / 60) % 24;
       const m = totalMinutes % 60;
       return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
@@ -266,8 +269,8 @@ window.IFL.parser = (function () {
         try {
           const wb = XLSX.read(e.target.result, { type: 'array', cellDates: false });
           if (fileIndex === 1) {
-            // File 1: check required sheets
-            const required = ['KPI Summary Report', 'CZ', 'SG', 'MY', 'THAI'];
+            // File 1: require at least 2 of the 4 region sheets (not the summary)
+            const required = ['CZ', 'SG', 'MY', 'THAI'];
             const found = required.filter(s => wb.SheetNames.includes(s));
             if (found.length < 2) {
               reject({ error: `Expected sheets not found. Found: ${wb.SheetNames.join(', ')}` });
