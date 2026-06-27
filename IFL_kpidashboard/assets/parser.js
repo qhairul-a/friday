@@ -51,42 +51,63 @@ window.IFL.parser = (function () {
     const shipments = [];
     let headerIdx = -1;
 
+    // Find header row: first col must be 'No.' or 'No'
     for (let i = 0; i < allRows.length; i++) {
-      const r = allRows[i];
-      const c0 = String(r[0] || '').trim().toLowerCase();
-      const c1 = String(r[1] || '').trim().toLowerCase();
-      if (c0 === 'no.' || c0 === 'no' || c1 === 'cw') { headerIdx = i; break; }
+      const c0 = String(allRows[i][0] || '').trim().toLowerCase();
+      if (c0 === 'no.' || c0 === 'no') { headerIdx = i; break; }
     }
     if (headerIdx === -1) return [];
+
+    // Dynamically map column names to indices — each sheet has different layouts
+    const hdr = allRows[headerIdx];
+    const col = {};
+    for (let i = 0; i < hdr.length; i++) {
+      const h = String(hdr[i] || '').trim().toLowerCase();
+      if (h === 'cw')                                           col.cw           = i;
+      else if (h.includes('shipment type'))                     col.shipmentType  = i;
+      else if ((h === 'truck number' || h === 'truck no.'))     col.truck         = i;
+      else if (h === 'kpi deadline')                            col.kpiDeadline   = i;
+      else if (h === 'delivered on')                            col.deliveredOn   = i;
+      else if (h === 'delivery time' && col.deliveredOn == null) col.deliveredOn  = i;
+      else if (h.includes('kpi pass') || h === 'kpi pass/fail') col.before       = i;
+      else if (h.includes('after investigation'))               col.after         = i;
+      else if ((h === 'date' || h.includes('collection date')) && col.date == null) col.date = i;
+      else if ((h === 'remarks' || h === 'remark for customer') && col.remarks == null) col.remarks = i;
+    }
+
+    // Must have at least CW and before-investigation columns to be useful
+    if (col.cw == null || col.before == null) return [];
 
     for (let i = headerIdx + 1; i < allRows.length; i++) {
       const r = allRows[i];
       if (r[0] === null || r[0] === '') continue;
-      if (isNaN(Number(r[0]))) continue; // skip summary/header rows
+      if (isNaN(Number(r[0]))) continue;
 
-      const cw = String(r[1] || '').trim();
-      if (!cw || !cw.toUpperCase().startsWith('CW')) continue;
+      // CW column is always an integer in these sheets (19, 20, 21…)
+      const cwRaw = r[col.cw];
+      if (cwRaw === null || cwRaw === undefined) continue;
+      const cw = typeof cwRaw === 'number' ? `CW${cwRaw}` : String(cwRaw).trim().toUpperCase().replace(/\s+/, '');
+      if (!cw.match(/^CW\d+/)) continue;
 
-      const achievedBefore = isPassFail(r[7], ['ACHIEV', 'PASS', 'YES', 'Y', '✓']);
-      const rawAfter = String(r[9] || '').trim().toUpperCase();
-      // After-investigation: blank = same as before, else parse
+      const achievedBefore = isPassFail(r[col.before], ['ACHIEV', 'PASS', 'YES', 'Y', '✓']);
+      const rawAfter = col.after != null ? String(r[col.after] || '').trim() : '';
       const achievedAfter = rawAfter === '' ? achievedBefore
-        : isPassFail(r[9], ['ACHIEV', 'PASS', 'YES', 'Y', '✓']);
+        : isPassFail(r[col.after], ['ACHIEV', 'PASS', 'YES', 'Y', '✓']);
 
       shipments.push({
         region: regionCode,
         hub: null,
         dealer: null,
         vin: null,
-        cw: cw.toUpperCase(),
-        date: excelDateToStr(r[2]),
-        shipmentType: String(r[3] || '').trim().toUpperCase(),
-        truckNumber: String(r[4] || '').trim(),
-        kpiDeadline: excelTimeToStr(r[5]),
-        deliveredOn: excelTimeToStr(r[6]),
+        cw,
+        date:         col.date       != null ? excelDateToStr(r[col.date])   : null,
+        shipmentType: col.shipmentType != null ? String(r[col.shipmentType] || '').trim().toUpperCase() : '',
+        truckNumber:  col.truck       != null ? String(r[col.truck]       || '').trim() : '',
+        kpiDeadline:  col.kpiDeadline != null ? excelTimeToStr(r[col.kpiDeadline]) : null,
+        deliveredOn:  col.deliveredOn != null ? excelTimeToStr(r[col.deliveredOn])  : null,
         achievedBefore,
         achievedAfter,
-        remarks: String(r[8] || '').trim(),
+        remarks:      col.remarks     != null ? String(r[col.remarks]     || '').trim() : '',
       });
     }
     return shipments;
