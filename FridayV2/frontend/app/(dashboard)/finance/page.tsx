@@ -21,7 +21,7 @@ const MAX_HEIGHT  = 1400;
 const DEFAULT_HEIGHTS: Record<string, number> = {
   summary:             220,
   spending_breakdown:  440,
-  spending_trend:      440,
+  spending_trend:      660,
   spending_frequency:  660,
   savings_trend:       440,
   top5_spending:       320,
@@ -611,21 +611,42 @@ export default function FinancePage() {
 
     spending_trend: (
       <div className="glass" style={{ padding: "24px" }}>
-        <div className="label-cyan" style={{ marginBottom: 16 }}>◈ Spending Trend — by Category</div>
-        <div className={`${finHidden} finance-blur`} style={{ flex: 1, minHeight: 0 }}>
+        <div className="label-cyan" style={{ marginBottom: 12 }}>◈ Spending Trend</div>
+        <div className={`${finHidden} finance-blur`} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 16 }}>
         {trendData.length > 0 ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={trendData}>
-              <CartesianGrid {...gridStyle} />
-              <XAxis dataKey="month" tick={axisStyle} axisLine={false} tickLine={false} />
-              <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={50} />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v) => typeof v === "number" ? `${cur} ${v.toFixed(2)}` : ""} />
-              <Legend iconType="square" iconSize={9} wrapperStyle={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-3)" }} />
-              {allCategories.map((cat, i) => (
-                <Line key={cat} type="monotone" dataKey={cat} stroke={PIE_COLORS[i % PIE_COLORS.length]} strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
+          <>
+            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
+              <div style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "var(--font-mono)", marginBottom: 4 }}>TOTAL / MONTH ({cur})</div>
+              <div style={{ flex: 1, minHeight: 0 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={totalPerMonthData}>
+                    <CartesianGrid {...gridStyle} />
+                    <XAxis dataKey="month" tick={axisStyle} axisLine={false} tickLine={false} />
+                    <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={50} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => typeof v === "number" ? `${cur} ${v.toFixed(2)}` : ""} />
+                    <Bar dataKey="total" fill="var(--cyan)" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div style={{ flex: 1.5, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
+              <div style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "var(--font-mono)", marginBottom: 4 }}>BY CATEGORY ({cur})</div>
+              <div style={{ flex: 1, minHeight: 0 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trendData}>
+                    <CartesianGrid {...gridStyle} />
+                    <XAxis dataKey="month" tick={axisStyle} axisLine={false} tickLine={false} />
+                    <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={50} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => typeof v === "number" ? `${cur} ${v.toFixed(2)}` : ""} />
+                    <Legend iconType="square" iconSize={9} wrapperStyle={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-3)" }} />
+                    {allCategories.map((cat, i) => (
+                      <Line key={cat} type="monotone" dataKey={cat} stroke={PIE_COLORS[i % PIE_COLORS.length]} strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </>
         ) : <p style={{ color: "var(--text-3)", fontSize: 13 }}>No data yet.</p>}
         </div>
       </div>
