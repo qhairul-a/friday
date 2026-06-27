@@ -69,6 +69,8 @@ steps:
       - --platform=managed
       - --port=8001
       - --allow-unauthenticated
+      - --min-instances=1
+      - --memory=1Gi
 
   # Deploy voice agent to Cloud Run (secrets + env vars preserved on every deploy)
   - name: gcr.io/cloud-builders/gcloud
