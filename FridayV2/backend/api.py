@@ -508,10 +508,16 @@ def get_finance_summary(month: Optional[str] = None):
         month_vars = [r for r in var_rows if r.get("date", "").startswith(target)]
         variable_total = sum(_parse_amount(r.get("amount", 0)) for r in month_vars)
 
+        # Normalize category names (trim + title-case) so "family" and "Family " merge
+        cat_display: dict[str, str] = {}  # normalized key -> display name
         by_category: dict[str, float] = {}
         for r in month_vars:
-            cat = r.get("category", "Other")
-            by_category[cat] = by_category.get(cat, 0) + _parse_amount(r.get("amount", 0))
+            raw_cat = r.get("category", "Other")
+            key = raw_cat.strip().lower()
+            if key not in cat_display:
+                cat_display[key] = raw_cat.strip()
+            display = cat_display[key]
+            by_category[display] = by_category.get(display, 0) + _parse_amount(r.get("amount", 0))
 
         return {
             "month": target,
