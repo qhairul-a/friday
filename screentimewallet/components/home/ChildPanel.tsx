@@ -65,22 +65,26 @@ export function ChildPanel({ child, photoUrl }: Props) {
         <span className={`text-xl font-bold capitalize ${NAME_STYLE[color]}`}>{child}</span>
       </div>
 
-      <BalanceDisplay balance={balance} color={color} />
+      {guardDone && (
+        <>
+          <BalanceDisplay balance={balance} color={color} />
 
-      <ReadingTimer
-        child={child}
-        onEarned={handleEarned}
-        screentimeActive={screentimeActive}
-        onActiveChange={setReadingActive}
-      />
+          <ReadingTimer
+            child={child}
+            onEarned={handleEarned}
+            screentimeActive={screentimeActive}
+            onActiveChange={setReadingActive}
+          />
 
-      <ScreentimeCountdown
-        child={child}
-        balance={balance}
-        onSetBalance={handleSetBalance}
-        readingActive={readingActive}
-        onActiveChange={setScreentimeActive}
-      />
+          <ScreentimeCountdown
+            child={child}
+            balance={balance}
+            onSetBalance={handleSetBalance}
+            readingActive={readingActive}
+            onActiveChange={setScreentimeActive}
+          />
+        </>
+      )}
     </div>
   )
 }
