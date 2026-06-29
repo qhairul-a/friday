@@ -16,14 +16,18 @@ interface Props {
 export function ProfileManager({ initialPhotos }: Props) {
   const [photos, setPhotos] = useState(initialPhotos)
   const [loading, setLoading] = useState<ChildName | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const inputRefs = useRef<Record<ChildName, HTMLInputElement | null>>({ qasim: null, muadz: null })
 
   async function handleFileChange(child: ChildName, file: File) {
     setLoading(child)
+    setError(null)
     try {
       const url = await uploadChildPhoto(child, file)
       await setChildPhotoUrl(child, url)
       setPhotos(prev => ({ ...prev, [child]: url }))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed')
     } finally {
       setLoading(null)
     }
@@ -32,6 +36,7 @@ export function ProfileManager({ initialPhotos }: Props) {
   return (
     <div className="mb-8">
       <h2 className="text-lg font-semibold text-slate-300 mb-4">Profile Photos</h2>
+      {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
       <div className="flex gap-6 flex-wrap">
         {CHILDREN.map(({ name, emoji, color }) => (
           <div key={name} className="flex flex-col items-center gap-3">

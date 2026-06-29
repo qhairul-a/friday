@@ -114,7 +114,7 @@ export async function getChildProfiles(): Promise<Record<ChildName, string | nul
 }
 
 export async function setChildPhotoUrl(child: ChildName, url: string | null): Promise<void> {
-  const { error } = await supabase.from('child_profiles').upsert({ child_name: child, photo_url: url, updated_at: new Date().toISOString() })
+  const { error } = await supabase.from('child_profiles').update({ photo_url: url, updated_at: new Date().toISOString() }).eq('child_name', child)
   if (error) throw error
 }
 

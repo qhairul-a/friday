@@ -71,9 +71,12 @@ function ChildView({ child }: { child: ChildName }) {
         <SessionGuard child={child} onResolved={handleGuardResolved} />
       )}
 
-      <div className="w-full flex items-center justify-between pt-4">
-        <Link href="/" className="text-slate-500 hover:text-slate-300 text-sm transition-colors">
-          ← Back
+      <div className="w-full pt-4">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white text-sm font-medium transition-colors"
+        >
+          ← Back to Home
         </Link>
       </div>
 

@@ -7,6 +7,7 @@ export function useReadingTimer(child: ChildName, onEarned: (minutes: number) =>
   const [isActive, setIsActive] = useState(false)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const sessionIdRef = useRef<string | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const startTimeRef = useRef<number>(0)
@@ -33,23 +34,32 @@ export function useReadingTimer(child: ChildName, onEarned: (minutes: number) =>
   }, [isActive])
 
   const start = useCallback(async () => {
-    const id = await startReadingSession(child)
-    sessionIdRef.current = id
-    startTimeRef.current = Date.now()
-    setElapsedSeconds(0)
-    setIsActive(true)
+    setError(null)
+    try {
+      const id = await startReadingSession(child)
+      sessionIdRef.current = id
+      startTimeRef.current = Date.now()
+      setElapsedSeconds(0)
+      setIsActive(true)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to start session')
+    }
   }, [child])
 
   const stop = useCallback(async () => {
     if (!sessionIdRef.current) return
     if (intervalRef.current) clearInterval(intervalRef.current)
     const earned = Math.floor(elapsedSeconds / 60)
-    await endReadingSession(sessionIdRef.current, earned)
-    onEarned(earned)
+    try {
+      await endReadingSession(sessionIdRef.current, earned)
+      onEarned(earned)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save session')
+    }
     sessionIdRef.current = null
     setIsActive(false)
     setElapsedSeconds(0)
   }, [elapsedSeconds, onEarned])
 
-  return { isActive, elapsedSeconds, isLoading, start, stop }
+  return { isActive, elapsedSeconds, isLoading, error, start, stop }
 }

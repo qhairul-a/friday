@@ -17,7 +17,7 @@ function formatTime(seconds: number) {
 }
 
 export function ReadingTimer({ child, onEarned, screentimeActive, onActiveChange }: Props) {
-  const { isActive, elapsedSeconds, isLoading, start, stop } = useReadingTimer(child, onEarned)
+  const { isActive, elapsedSeconds, isLoading, error, start, stop } = useReadingTimer(child, onEarned)
 
   useEffect(() => { onActiveChange?.(isActive) }, [isActive, onActiveChange])
 
@@ -26,6 +26,7 @@ export function ReadingTimer({ child, onEarned, screentimeActive, onActiveChange
   return (
     <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-6 flex flex-col items-center gap-4">
       <h2 className="text-lg font-semibold text-slate-300">Reading Timer</h2>
+      {error && <p className="text-red-400 text-sm text-center">{error}</p>}
 
       {isActive && (
         <div className="text-center">
