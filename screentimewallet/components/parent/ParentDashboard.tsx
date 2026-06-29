@@ -1,11 +1,11 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { RecordsTable } from './RecordsTable'
 import { AnalyticsView } from './AnalyticsView'
 import { SessionModal } from './SessionModal'
 import { ProfileManager } from './ProfileManager'
-import { createReadingSession, updateReadingSession, deleteReadingSession } from '@/lib/queries'
+import { createReadingSession, updateReadingSession, deleteReadingSession, addToBalance } from '@/lib/queries'
 import type { ReadingSession, ScreentimeSession, ChildName } from '@/types'
 
 interface Props {
@@ -23,6 +23,8 @@ export function ParentDashboard({ readingSessions, screentimeSessions, initialPh
   const [modal, setModal] = useState<ModalState>(null)
   const router = useRouter()
 
+  useEffect(() => { setSessions(readingSessions) }, [readingSessions])
+
   async function handleGoHome() {
     await fetch('/api/parent-logout', { method: 'POST' })
     router.push('/')
@@ -31,8 +33,11 @@ export function ParentDashboard({ readingSessions, screentimeSessions, initialPh
   async function handleSave(data: { child_name: ChildName; started_at: string; ended_at: string; duration_minutes: number }) {
     if (modal === 'add') {
       await createReadingSession(data)
+      await addToBalance(data.child_name, data.duration_minutes)
     } else if (modal && typeof modal === 'object') {
+      await addToBalance(modal.child_name, -(modal.duration_minutes ?? 0))
       await updateReadingSession(modal.id, data)
+      await addToBalance(data.child_name, data.duration_minutes)
     }
     setModal(null)
     router.refresh()
